@@ -112,11 +112,82 @@ class _CheckpointListReportScreenState extends State<CheckpointListReportScreen>
       rethrow;
     }
 
+    pw.MemoryImage? headerImage;
+    pw.MemoryImage? footerImage;
+    try {
+      final headerBytes = await rootBundle.load('assets/images/SecurityHeader.png');
+      headerImage = pw.MemoryImage(headerBytes.buffer.asUint8List());
+    } catch (_) {}
+    try {
+      final footerBytes = await rootBundle.load('assets/images/SecurityFooter.png');
+      footerImage = pw.MemoryImage(footerBytes.buffer.asUint8List());
+    } catch (_) {}
+
+    // 🎯 DEFINING THE 8x13 INCH (LONG BOND) PAGE FORMAT
+    const double longBondWidth = 8.0 * PdfPageFormat.inch;
+    const double longBondHeight = 13.0 * PdfPageFormat.inch;
+    final PdfPageFormat _longBondPageFormat = PdfPageFormat(longBondWidth, longBondHeight);
+
+
     final doc = pw.Document(theme: pw.ThemeData.withFont(base: base, bold: bold));
     doc.addPage(
       pw.MultiPage(
+        // ✅ Using the newly defined 8x13 page format
         pageFormat: _longBondPageFormat,
-        margin: const pw.EdgeInsets.only(left: 40, right: 40, top: 80, bottom: 80),
+        margin: const pw.EdgeInsets.only(left: 40, right: 40, top: 20, bottom: 0),
+        header: (context) => headerImage != null
+            ? pw.Center(
+          child: pw.Image(
+            headerImage,
+            fit: pw.BoxFit.fitWidth,
+            height: 90,
+          ),
+        )
+            : pw.SizedBox.shrink(),
+        // 🟢 MODIFIED FOOTER: Signature block conditional on last page, above footer image.
+        footer: (context) {
+          final isLastPage = context.pageNumber == context.pagesCount;
+
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              // Signature Block (Only on Last Page)
+              if (isLastPage)
+                pw.Padding(
+                  padding: const pw.EdgeInsets.only(top: 8, bottom: 8),
+                  child: pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.center,
+                    children: [
+                      pw.Column(
+                        children: [
+                          pw.Text('Prepared by:', style: const pw.TextStyle(fontSize: 11)),
+                          pw.SizedBox(height: 16),
+                          pw.Text(
+                            'PRINCE JUN N. DAMASCO',
+                            style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+                          ),
+                          pw.Text('Head, Security Services', style: const pw.TextStyle(fontSize: 11)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+              // Footer Image (Every Page)
+              if (footerImage != null)
+                pw.Center(
+                  child: pw.Image(
+                    footerImage,
+                    fit: pw.BoxFit.fitWidth,
+                    height: 60,
+                  ),
+                )
+              else
+                pw.SizedBox.shrink(),
+            ],
+          );
+        },
+        // 🟢 MODIFIED BUILD: Main content only.
         build: (context) => [
           pw.Center(
             child: pw.Text(
@@ -157,36 +228,6 @@ class _CheckpointListReportScreenState extends State<CheckpointListReportScreen>
           ),
           pw.SizedBox(height: 12),
           pw.Text('Total Checkpoints: ${rows.length}', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
-          pw.SizedBox(height: 40),
-          pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-            children: [
-              pw.Align(
-                alignment: pw.Alignment.centerLeft,
-                child: pw.Text(
-                  'Prepared by:',
-                  style: const pw.TextStyle(fontSize: 11),
-                ),
-              ),
-              pw.SizedBox(height: 20),
-              pw.Align(
-                alignment: pw.Alignment.center,
-                child: pw.Column(
-                  children: [
-                    pw.Text(
-                      'PRINCE JUN N. DAMASCO',
-                      style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
-                    ),
-                    pw.SizedBox(height: 4),
-                    pw.Text(
-                      'Head, Security Services',
-                      style: const pw.TextStyle(fontSize: 11),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );

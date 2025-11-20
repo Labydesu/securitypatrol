@@ -115,93 +115,129 @@ class _GuardListReportScreenState extends State<GuardListReportScreen> {
       base = bold;
     }
 
+    pw.MemoryImage? headerImage;
+    pw.MemoryImage? footerImage;
+    try {
+      final headerBytes = await rootBundle.load('assets/images/SecurityHeader.png');
+      headerImage = pw.MemoryImage(headerBytes.buffer.asUint8List());
+    } catch (_) {}
+    try {
+      final footerBytes = await rootBundle.load('assets/images/SecurityFooter.png');
+      footerImage = pw.MemoryImage(footerBytes.buffer.asUint8List());
+    } catch (_) {}
+
+    // 🎯 DEFINING THE 8x13 INCH (LONG BOND) PAGE FORMAT
+    const double longBondWidth = 8.0 * PdfPageFormat.inch;
+    const double longBondHeight = 13.0 * PdfPageFormat.inch;
+    final PdfPageFormat _longBondPageFormat = PdfPageFormat(longBondWidth, longBondHeight);
+
     final doc = pw.Document(theme: pw.ThemeData.withFont(base: base, bold: bold));
     doc.addPage(
-      pw.Page(
+      pw.MultiPage(
+        // ✅ Using the defined 8x13 page format
         pageFormat: _longBondPageFormat,
-        margin: const pw.EdgeInsets.only(left: 40, right: 40, top: 80, bottom: 80),
-        build: (context) {
+        margin: const pw.EdgeInsets.only(left: 40, right: 40, top: 20, bottom: 0),
+        // 🎯 HEADER IS ON EVERY PAGE
+        header: (context) => headerImage != null
+            ? pw.Center(
+          child: pw.Image(
+            headerImage,
+            fit: pw.BoxFit.fitWidth,
+            height: 90,
+          ),
+        )
+            : pw.SizedBox.shrink(),
+        // 🟢 CORRECTED FOOTER: Signature block is conditional (last page only), above the image (every page).
+        footer: (context) {
+          final isLastPage = context.pageNumber == context.pagesCount;
+
           return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
-              pw.Center(
-                child: pw.Text(
-                  'Security Guards',
-                  style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold),
-                ),
-              ),
-              pw.SizedBox(height: 8),
-              pw.Text('Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}', style: const pw.TextStyle(fontSize: 10)),
-              pw.SizedBox(height: 16),
-              pw.Table(
-                border: pw.TableBorder.all(),
-                columnWidths: {
-                  0: const pw.FixedColumnWidth(30),
-                  1: const pw.FlexColumnWidth(1.6),
-                  2: const pw.FlexColumnWidth(1.2),
-                  3: const pw.FlexColumnWidth(1.2),
-                  4: const pw.FlexColumnWidth(1.6),
-                },
-                children: [
-                  pw.TableRow(
-                    decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+              // Signature Block (Only on Last Page)
+              if (isLastPage)
+                pw.Padding(
+                  padding: const pw.EdgeInsets.only(top: 8, bottom: 8),
+                  child: pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.center,
                     children: [
-                      _cell('No.', bold: true),
-                      _cell('Guard Name', bold: true),
-                      _cell('Guard ID', bold: true),
-                      _cell('Position', bold: true),
-                      _cell('Email', bold: true),
+                      pw.Column(
+                        children: [
+                          pw.Text('Prepared by:', style: const pw.TextStyle(fontSize: 11)),
+                          pw.SizedBox(height: 16),
+                          pw.Text(
+                            'PRINCE JUN N. DAMASCO',
+                            style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+                          ),
+                          pw.Text('Head, Security Services', style: const pw.TextStyle(fontSize: 11)),
+                        ],
+                      ),
                     ],
                   ),
-                  ...List.generate(rows.length, (i) {
-                    final r = rows[i];
-                    return pw.TableRow(
-                      children: [
-                        _cell('${i + 1}'),
-                        _cell(r['name'] as String),
-                        _cell(r['guard_id'] as String),
-                        _cell(r['position'] as String),
-                        _cell(r['email'] as String),
-                      ],
-                    );
-                  }),
-                ],
-              ),
-              pw.SizedBox(height: 12),
-              pw.Text('Total Guards: ${rows.length}', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 40),
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-                children: [
-                  pw.Align(
-                    alignment: pw.Alignment.centerLeft,
-                    child: pw.Text(
-                      'Prepared by:',
-                      style: const pw.TextStyle(fontSize: 11),
-                    ),
+                ),
+
+              // Footer Image (Every Page)
+              if (footerImage != null)
+                pw.Center(
+                  child: pw.Image(
+                    footerImage,
+                    fit: pw.BoxFit.fitWidth,
+                    height: 60,
                   ),
-                  pw.SizedBox(height: 20),
-                  pw.Align(
-                    alignment: pw.Alignment.center,
-                    child: pw.Column(
-                      children: [
-                        pw.Text(
-                          'PRINCE JUN N. DAMASCO',
-                          style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
-                        ),
-                        pw.SizedBox(height: 4),
-                        pw.Text(
-                          'Head, Security Services',
-                          style: const pw.TextStyle(fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                )
+              else
+                pw.SizedBox.shrink(),
             ],
           );
         },
+        // 🎯 BUILD: Contains the main content only.
+        build: (context) => [
+          pw.Center(
+            child: pw.Text(
+              'Security Guards',
+              style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold),
+            ),
+          ),
+          pw.SizedBox(height: 8),
+          pw.Text('Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}', style: const pw.TextStyle(fontSize: 10)),
+          pw.SizedBox(height: 16),
+          pw.Table(
+            border: pw.TableBorder.all(),
+            columnWidths: {
+              0: const pw.FixedColumnWidth(30),
+              1: const pw.FlexColumnWidth(1.6),
+              2: const pw.FlexColumnWidth(1.2),
+              3: const pw.FlexColumnWidth(1.2),
+              4: const pw.FlexColumnWidth(1.6),
+            },
+            children: [
+              pw.TableRow(
+                decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                children: [
+                  _cell('No.', bold: true),
+                  _cell('Guard Name', bold: true),
+                  _cell('Guard ID', bold: true),
+                  _cell('Position', bold: true),
+                  _cell('Email', bold: true),
+                ],
+              ),
+              ...List.generate(rows.length, (i) {
+                final r = rows[i];
+                return pw.TableRow(
+                  children: [
+                    _cell('${i + 1}'),
+                    _cell(r['name'] as String),
+                    _cell(r['guard_id'] as String),
+                    _cell(r['position'] as String),
+                    _cell(r['email'] as String),
+                  ],
+                );
+              }),
+            ],
+          ),
+          pw.SizedBox(height: 12),
+          pw.Text('Total Guards: ${rows.length}', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+        ],
       ),
     );
     return doc.save();

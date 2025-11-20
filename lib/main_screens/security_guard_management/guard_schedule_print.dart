@@ -6,6 +6,7 @@ import 'package:async/async.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:flutter/services.dart' show rootBundle;
 
 const PdfPageFormat _longBondPageFormat = PdfPageFormat(
   8.5 * PdfPageFormat.inch,
@@ -32,24 +33,40 @@ class _GuardSchedulePrintScreenState extends State<GuardSchedulePrintScreen> {
   bool _isLoadingGuards = false;
   String? _guardsError;
 
-  // Font data for PDF generation
+  // Font and asset data for PDF generation
   pw.Font? _robotoRegular;
   pw.Font? _robotoBold;
   pw.Font? _robotoItalic;
+  pw.MemoryImage? _headerImage;
+  pw.MemoryImage? _footerImage;
 
   @override
   void initState() {
     super.initState();
     _fetchGuards();
-    _loadFonts();
+    _loadAssets();
   }
 
-  Future<void> _loadFonts() async {
+  Future<void> _loadAssets() async {
     try {
       // Load Roboto fonts for PDF generation
       _robotoRegular = await PdfGoogleFonts.robotoRegular();
       _robotoBold = await PdfGoogleFonts.robotoBold();
       _robotoItalic = await PdfGoogleFonts.robotoItalic();
+
+      try {
+        final headerBytes = await rootBundle.load('assets/images/SecurityHeader.png');
+        _headerImage = pw.MemoryImage(headerBytes.buffer.asUint8List());
+      } catch (e) {
+        print('Error loading header image: $e');
+      }
+
+      try {
+        final footerBytes = await rootBundle.load('assets/images/SecurityFooter.png');
+        _footerImage = pw.MemoryImage(footerBytes.buffer.asUint8List());
+      } catch (e) {
+        print('Error loading footer image: $e');
+      }
     } catch (e) {
       print('Error loading fonts: $e');
       // Fallback to default fonts if custom fonts fail to load
@@ -223,12 +240,6 @@ class _GuardSchedulePrintScreenState extends State<GuardSchedulePrintScreen> {
         );
         return;
       }
-
-      final reportText = _generateTextReport(scheduleData);
-      if (mounted) {
-        _showReportDialog(reportText);
-      }
-
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -314,72 +325,16 @@ class _GuardSchedulePrintScreenState extends State<GuardSchedulePrintScreen> {
     return allSchedules;
   }
 
-  String _generateTextReport(List<Map<String, dynamic>> scheduleData) {
-    final buffer = StringBuffer();
-    final String periodString;
-
-    if (_periodType == 'Monthly') {
-      periodString = DateFormat('MMMM yyyy').format(_anchorDate);
-    } else {
-      final startOfWeek = _anchorDate.subtract(Duration(days: _anchorDate.weekday - 1));
-      final endOfWeek = startOfWeek.add(const Duration(days: 6));
-      periodString = '${DateFormat('MMM d').format(startOfWeek)} - ${DateFormat('MMM d, yyyy').format(endOfWeek)}';
-    }
-
-    buffer.writeln('SECURITY GUARD SCHEDULE REPORT');
-    buffer.writeln('=' * 40);
-    buffer.writeln('Guard: ${_selectedGuardName ?? 'Unknown'}');
-    buffer.writeln('Period: $periodString');
-    buffer.writeln('Schedule Type: $_scheduleType');
-    buffer.writeln('Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}');
-    buffer.writeln();
-
-    buffer.writeln('Date\t\tStart\t\tEnd');
-    buffer.writeln('-' * 40);
-
-    if(scheduleData.isEmpty) {
-      buffer.writeln('No schedules found for this period.');
-    } else {
-      for (final schedule in scheduleData) {
-        buffer.writeln('${schedule['date']}\t${schedule['start_time']}\t${schedule['end_time']}');
-      }
-    }
-
-    buffer.writeln();
-    buffer.writeln('Total Shifts: ${scheduleData.length}');
-
-    return buffer.toString();
-  }
-
-  void _showReportDialog(String reportText) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Schedule Report'),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 400,
-          child: SingleChildScrollView(
-            child: Text(
-              reportText,
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
 
   Future<void> _generateAndPrintPDF(List<Map<String, dynamic>> scheduleData) async {
     try {
       final pdf = pw.Document();
-      
+
+      // 1. Font and Theme Definition
+      final font = await rootBundle.load("assets/fonts/Roboto-Regular.ttf");
+      final boldFont = await rootBundle.load("assets/fonts/Roboto-Bold.ttf");
+      final theme = pw.ThemeData.withFont(base: pw.Font.ttf(font), bold: pw.Font.ttf(boldFont));
+
       // Sort the data before generating PDF
       final sortedScheduleData = List<Map<String, dynamic>>.from(scheduleData);
       sortedScheduleData.sort((a, b) {
@@ -387,7 +342,7 @@ class _GuardSchedulePrintScreenState extends State<GuardSchedulePrintScreen> {
         if (dateCompare != 0) return dateCompare;
         return (a['start_time'] as String).compareTo(b['start_time'] as String);
       });
-      
+
       final String periodString;
       if (_periodType == 'Monthly') {
         periodString = DateFormat('MMMM yyyy').format(_anchorDate);
@@ -397,312 +352,169 @@ class _GuardSchedulePrintScreenState extends State<GuardSchedulePrintScreen> {
         periodString = '${DateFormat('MMM d').format(startOfWeek)} - ${DateFormat('MMM d, yyyy').format(endOfWeek)}';
       }
 
+      // 2. Image Loading
+      pw.MemoryImage? headerImage;
+      pw.MemoryImage? footerImage;
+      try {
+        final headerBytes = await rootBundle.load('assets/images/SecurityHeader.png');
+        headerImage = pw.MemoryImage(headerBytes.buffer.asUint8List());
+      } catch (_) {}
+      try {
+        final footerBytes = await rootBundle.load('assets/images/SecurityFooter.png');
+        footerImage = pw.MemoryImage(footerBytes.buffer.asUint8List());
+      } catch (_) {}
+
+      final headerImg = headerImage;
+      final footerImg = footerImage;
+
+      // 3. Custom Page Format: 8.5 x 13 inches (Long Bond)
+      const double longBondWidth = 8.5 * PdfPageFormat.inch;
+      const double longBondHeight = 13.0 * PdfPageFormat.inch;
+      final pageFormat = PdfPageFormat(longBondWidth, longBondHeight);
+
       pdf.addPage(
         pw.MultiPage(
-          pageFormat: _longBondPageFormat,
-          margin: const pw.EdgeInsets.only(left: 40, right: 40, top: 80, bottom: 80),
-          build: (pw.Context context) {
-            return [
-              // Header Section
-              pw.Container(
-                width: double.infinity,
-                padding: const pw.EdgeInsets.all(20),
-                decoration: pw.BoxDecoration(
-                  color: PdfColors.blue50,
-                  border: pw.Border.all(color: PdfColors.blue200, width: 2),
-                  borderRadius: pw.BorderRadius.circular(8),
-                ),
-                child: pw.Column(
-              children: [
-                    pw.Text(
-                    'SECURITY GUARD SCHEDULE REPORT',
-                      style: pw.TextStyle(
-                        fontSize: 24,
-                        fontWeight: pw.FontWeight.bold,
-                        font: _robotoBold,
-                        color: PdfColors.blue900,
+          theme: theme,
+          pageFormat: pageFormat,
+          margin: const pw.EdgeInsets.only(left: 50, right: 40, top: 20, bottom: 0),
+
+          header: (context) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              if (headerImg != null)
+                pw.Center(
+                  child: pw.Image(
+                    headerImg,
+                    fit: pw.BoxFit.fitWidth,
+                    height: 90,
                   ),
-                      textAlign: pw.TextAlign.center,
                 ),
-                    pw.SizedBox(height: 16),
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                            pw.Text(
-                              'Guard: ${_selectedGuardName ?? 'Unknown'}',
-                              style: pw.TextStyle(
-                                fontSize: 14,
-                                font: _robotoRegular,
-                                fontWeight: pw.FontWeight.bold,
-                              ),
-                            ),
-                            pw.SizedBox(height: 4),
-                            pw.Text(
-                              'Period: $periodString',
-                              style: pw.TextStyle(
-                                fontSize: 12,
-                                font: _robotoRegular,
-                              ),
-                            ),
-                            pw.SizedBox(height: 4),
-                            pw.Text(
-                              'Schedule Type: $_scheduleType',
-                              style: pw.TextStyle(
-                                fontSize: 12,
-                                font: _robotoRegular,
-                              ),
-                            ),
-                          ],
-                        ),
-                        pw.Column(
-                          crossAxisAlignment: pw.CrossAxisAlignment.end,
-                          children: [
-                            pw.Text(
-                              'Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}',
-                              style: pw.TextStyle(
-                                fontSize: 10,
-                                font: _robotoItalic,
-                                color: PdfColors.grey600,
-                              ),
-                    ),
-                  ],
-                ),
-                      ],
-                    ),
-                  ],
+              pw.SizedBox(height: 12),
+              pw.Center(
+                child: pw.Text(
+                  'SECURITY GUARD SCHEDULE REPORT',
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 18),
                 ),
               ),
-              
-              pw.SizedBox(height: 24),
-                
-                // Schedule Table
-              if (sortedScheduleData.isNotEmpty) ...[
-                pw.Text(
-                  'SCHEDULE DETAILS',
-                  style: pw.TextStyle(
-                    fontSize: 16,
-                    font: _robotoBold,
-                    color: PdfColors.blue800,
-                  ),
-                ),
-                pw.SizedBox(height: 12),
-                
-                pw.Table(
-                  border: pw.TableBorder.all(
-                    color: PdfColors.blue200,
-                    width: 1,
-                  ),
-                  columnWidths: {
-                    0: const pw.FlexColumnWidth(2),
-                    1: const pw.FlexColumnWidth(2),
-                    2: const pw.FlexColumnWidth(2),
-                    3: const pw.FlexColumnWidth(1.5),
-                  },
-                  children: [
-                    // Header row
-                    pw.TableRow(
-                      decoration: pw.BoxDecoration(
-                        color: PdfColors.blue100,
-                        borderRadius: const pw.BorderRadius.only(
-                          topLeft: pw.Radius.circular(4),
-                          topRight: pw.Radius.circular(4),
-                        ),
-                      ),
-                      children: [
-                        pw.Container(
-                          padding: const pw.EdgeInsets.all(12),
-                          child: pw.Text(
-                            'DATE',
-                            style: pw.TextStyle(
-                              fontSize: 12,
-                              font: _robotoBold,
-                              color: PdfColors.blue900,
-                            ),
-                            textAlign: pw.TextAlign.center,
-                          ),
-                        ),
-                        pw.Container(
-                          padding: const pw.EdgeInsets.all(12),
-                          child: pw.Text(
-                            'START TIME',
-                            style: pw.TextStyle(
-                              fontSize: 12,
-                              font: _robotoBold,
-                              color: PdfColors.blue900,
-                            ),
-                            textAlign: pw.TextAlign.center,
-                          ),
-                        ),
-                        pw.Container(
-                          padding: const pw.EdgeInsets.all(12),
-                          child: pw.Text(
-                            'END TIME',
-                            style: pw.TextStyle(
-                              fontSize: 12,
-                              font: _robotoBold,
-                              color: PdfColors.blue900,
-                            ),
-                            textAlign: pw.TextAlign.center,
-                          ),
-                        ),
-                        pw.Container(
-                          padding: const pw.EdgeInsets.all(12),
-                          child: pw.Text(
-                            'STATUS',
-                            style: pw.TextStyle(
-                              fontSize: 12,
-                              font: _robotoBold,
-                              color: PdfColors.blue900,
-                            ),
-                            textAlign: pw.TextAlign.center,
-                          ),
-                        ),
-                      ],
-                    ),
-                    // Data rows
-                    ...sortedScheduleData.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final schedule = entry.value;
-                      final isEven = index % 2 == 0;
-                      
-                      return pw.TableRow(
-                        decoration: pw.BoxDecoration(
-                          color: isEven ? PdfColors.white : PdfColors.grey50,
-                        ),
-                      children: [
-                          pw.Container(
-                            padding: const pw.EdgeInsets.all(10),
-                            child: pw.Text(
-                              schedule['date'] as String,
-                              style: pw.TextStyle(
-                                fontSize: 11,
-                                font: _robotoRegular,
-                        ),
-                              textAlign: pw.TextAlign.center,
-                            ),
-                        ),
-                          pw.Container(
-                            padding: const pw.EdgeInsets.all(10),
-                          child: pw.Text(
-                              schedule['start_time'] as String,
-                              style: pw.TextStyle(
-                                fontSize: 11,
-                                font: _robotoRegular,
-                              ),
-                              textAlign: pw.TextAlign.center,
-                            ),
-                          ),
-                          pw.Container(
-                            padding: const pw.EdgeInsets.all(10),
-                            child: pw.Text(
-                              schedule['end_time'] as String,
-                              style: pw.TextStyle(
-                                fontSize: 11,
-                                font: _robotoRegular,
-                              ),
-                              textAlign: pw.TextAlign.center,
-                            ),
-                          ),
-                          pw.Container(
-                            padding: const pw.EdgeInsets.all(10),
-                            child: pw.Container(
-                              padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: pw.BoxDecoration(
-                                color: schedule['type'] == 'EndedSchedules' 
-                                    ? PdfColors.red100 
-                                    : PdfColors.green100,
-                                borderRadius: pw.BorderRadius.circular(12),
-                                border: pw.Border.all(
-                                  color: schedule['type'] == 'EndedSchedules' 
-                                      ? PdfColors.red300 
-                                      : PdfColors.green300,
-                                  width: 1,
-                                ),
-                              ),
-                              child: pw.Text(
-                                schedule['type'] == 'EndedSchedules' ? 'ENDED' : 'ACTIVE',
-                                style: pw.TextStyle(
-                                  fontSize: 9,
-                                  font: _robotoBold,
-                                  color: schedule['type'] == 'EndedSchedules' 
-                                      ? PdfColors.red800 
-                                      : PdfColors.green800,
-                                ),
-                                textAlign: pw.TextAlign.center,
-                              ),
-                          ),
-                        ),
-                      ],
-                      );
-                    }),
-                  ],
-                ),
-                
-                pw.SizedBox(height: 24),
-              ] else ...[
-                pw.Container(
-                  width: double.infinity,
-                  padding: const pw.EdgeInsets.all(40),
-                  decoration: pw.BoxDecoration(
-                    color: PdfColors.grey100,
-                    borderRadius: pw.BorderRadius.circular(8),
-                    border: pw.Border.all(color: PdfColors.grey300),
-                  ),
-                  child: pw.Column(
+              pw.SizedBox(height: 10), // Small space after the title before the main content begins
+            ],
+          ),
+
+          // 5. 🚨 FOOTER CALLBACK: Conditional content
+          footer: (context) {
+            // Conditional Signature Block
+            final signatureBlock = (context.pageNumber == context.pagesCount)
+                ? pw.Padding(
+              padding: const pw.EdgeInsets.only(top: 8, bottom: 8),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.center,
+                children: [
+                  pw.Column(
                     children: [
-                      pw.Icon(
-                        pw.IconData(0xe0b7), // info icon
-                        size: 48,
-                        color: PdfColors.grey600,
-                      ),
+                      pw.Text('Prepared by:', style: const pw.TextStyle(fontSize: 11)),
                       pw.SizedBox(height: 16),
                       pw.Text(
-                        'No schedules found for the selected period',
-                        style: pw.TextStyle(
-                          fontSize: 16,
-                          font: _robotoRegular,
-                          color: PdfColors.grey700,
-                        ),
-                        textAlign: pw.TextAlign.center,
+                        'PRINCE JUN N. DAMASCO',
+                        style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
                       ),
+                      pw.Text('Head, Security Services', style: const pw.TextStyle(fontSize: 11)),
                     ],
                   ),
-                ),
-                pw.SizedBox(height: 24),
+                ],
+              ),
+            )
+                : pw.SizedBox(height: 10); // Placeholder space on other pages
+
+            // Fixed Footer Image
+            final imageWidget = (footerImg != null)
+                ? pw.Center(
+              child: pw.Image(
+                footerImg,
+                fit: pw.BoxFit.fitWidth,
+                height: 60,
+              ),
+            )
+                : pw.SizedBox.shrink();
+
+            // Combine the conditional signature block and the fixed image
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              mainAxisAlignment: pw.MainAxisAlignment.end, // Ensure content sits at the bottom edge
+              children: [
+                signatureBlock,
+                imageWidget,
               ],
-              
-              // Summary Section
-              pw.Container(
-                width: double.infinity,
-                padding: const pw.EdgeInsets.all(16),
-                decoration: pw.BoxDecoration(
-                  color: PdfColors.blue50,
-                  borderRadius: pw.BorderRadius.circular(8),
-                  border: pw.Border.all(color: PdfColors.blue200),
+            );
+          },
+
+          // 6. Build Content (Unique Info Block, Detailed Table, and Summary)
+          build: (pw.Context context) {
+            // --- Data preparation for the simple table layout ---
+            final List<List<String>> tableData = sortedScheduleData.map((schedule) {
+              final statusText = schedule['type'] == 'EndedSchedules' ? 'ENDED' : 'ACTIVE';
+              return [
+                schedule['date'] as String,
+                schedule['start_time'] as String,
+                schedule['end_time'] as String,
+                statusText,
+              ];
+            }).toList();
+            // ---------------------------------------------------
+
+            return [
+              // UNIQUE INFO BLOCK: Now only appears on the first page
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('Security Guard: ${_selectedGuardName ?? 'Unknown'}'),
+                  pw.Text('Period: $periodString'),
+                  pw.Text('Schedule Type: $_scheduleType'),
+                  pw.Text('Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}'),
+                  pw.SizedBox(height: 20), // Gap before the main table
+                ],
+              ),
+
+              // Table Header Title
+              pw.Text(
+                'SCHEDULE DETAILS',
+                style: pw.TextStyle(
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.blue800,
                 ),
-                child: pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                pw.Text(
-                  'Total Shifts: ${sortedScheduleData.length}',
-                      style: pw.TextStyle(
-                        fontSize: 14,
-                        font: _robotoBold,
-                        color: PdfColors.blue900,
-                      ),
-                    ),
-                    pw.Text(
-                      'Report Generated: ${DateFormat('MMM dd, yyyy').format(DateTime.now())}',
-                      style: pw.TextStyle(
-                        fontSize: 10,
-                        font: _robotoItalic,
-                        color: PdfColors.blue700,
-                      ),
-                ),
-              ],
+              ),
+              pw.SizedBox(height: 12),
+
+              // Table with the required columns (simple design)
+              pw.TableHelper.fromTextArray(
+                border: pw.TableBorder.all(),
+                headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.black),
+                headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                cellHeight: 30,
+                cellAlignments: {
+                  0: pw.Alignment.center, // DATE
+                  1: pw.Alignment.center, // START TIME
+                  2: pw.Alignment.center, // END TIME
+                  3: pw.Alignment.center, // STATUS
+                },
+                columnWidths: {
+                  0: const pw.FlexColumnWidth(2),
+                  1: const pw.FlexColumnWidth(2),
+                  2: const pw.FlexColumnWidth(2),
+                  3: const pw.FlexColumnWidth(1.5),
+                },
+                headers: ['DATE', 'START TIME', 'END TIME', 'STATUS'],
+                data: tableData,
+              ),
+
+              pw.SizedBox(height: 24),
+
+              // Summary Section (Total Shifts) - Simple text
+              pw.Text(
+                'Total Shifts: ${sortedScheduleData.length}',
+                style: pw.TextStyle(
+                  fontSize: 14,
+                  fontWeight: pw.FontWeight.bold,
                 ),
               ),
             ];
@@ -713,9 +525,9 @@ class _GuardSchedulePrintScreenState extends State<GuardSchedulePrintScreen> {
       // Print the PDF
       await Printing.layoutPdf(
         onLayout: (PdfPageFormat format) async => pdf.save(),
-        name: 'Security_Guard_Schedule_${_selectedGuardName?.replaceAll(' ', '_')}_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.pdf',
+        name: 'Checkpoint_Summary_${_selectedGuardName?.replaceAll(' ', '_')}_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.pdf',
       );
-      
+
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

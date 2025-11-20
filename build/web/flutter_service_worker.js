@@ -3,7 +3,9 @@ const MANIFEST = 'flutter-app-manifest';
 const TEMP = 'flutter-temp-cache';
 const CACHE_NAME = 'flutter-app-cache';
 
-const RESOURCES = {"assets/AssetManifest.bin": "059ea2ded80ed4e8aff9706fffd7fb48",
+const RESOURCES = {".vercel/project.json": "e630454efaeabdb07fded329fd92660c",
+".vercel/README.txt": "2b13c79d37d6ed82a3255b83b6815034",
+"assets/AssetManifest.bin": "059ea2ded80ed4e8aff9706fffd7fb48",
 "assets/AssetManifest.bin.json": "9d93798ddfe533023d3954ae2bd7b8ce",
 "assets/AssetManifest.json": "d252152d90f4532de4ce2a9dc5d7d58d",
 "assets/assets/fonts/Roboto-Bold.ttf": "dd5415b95e675853c6ccdceba7324ce7",
@@ -29,7 +31,7 @@ const RESOURCES = {"assets/AssetManifest.bin": "059ea2ded80ed4e8aff9706fffd7fb48
 "canvaskit/skwasm_heavy.wasm": "8034ad26ba2485dab2fd49bdd786837b",
 "favicon.png": "5dcef449791fa27946b3d35ad8803796",
 "flutter.js": "888483df48293866f9f41d3d9274a779",
-"flutter_bootstrap.js": "a30a0c9da8cae7db99401a3f6c52bdcf",
+"flutter_bootstrap.js": "afaea1f58c9469b30dea17e0e2c289e3",
 "icons/Icon-192.png": "ac9a721a12bbc803b44f645561ecb1e1",
 "icons/Icon-512.png": "96e752610906ba2a93c65f8abe1645f1",
 "icons/Icon-maskable-192.png": "c457ef57daa1d16f64b27b786ec2ea3c",

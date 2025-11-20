@@ -364,14 +364,45 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
         periodString = '${DateFormat('MMM d').format(startOfWeek)} - ${DateFormat('MMM d, yyyy').format(endOfWeek)}';
       }
 
+      pw.MemoryImage? headerImage;
+      pw.MemoryImage? footerImage;
+      try {
+        final headerBytes = await rootBundle.load('assets/images/SecurityHeader.png');
+        headerImage = pw.MemoryImage(headerBytes.buffer.asUint8List());
+      } catch (_) {}
+      try {
+        final footerBytes = await rootBundle.load('assets/images/SecurityFooter.png');
+        footerImage = pw.MemoryImage(footerBytes.buffer.asUint8List());
+      } catch (_) {}
+
+      final headerImg = headerImage;
+      final footerImg = footerImage;
+
+      // Define the custom page size for Long Bond (8.5 x 13 inches)
+      const double longBondWidth = 8.5 * PdfPageFormat.inch;
+      const double longBondHeight = 13.0 * PdfPageFormat.inch;
+      final pageFormat = PdfPageFormat(longBondWidth, longBondHeight);
+
       pdf.addPage(
         pw.MultiPage(
           theme: theme,
-          pageFormat: _longBondPageFormat,
-          margin: const pw.EdgeInsets.only(left: 40, right: 40, top: 80, bottom: 80),
+          pageFormat: pageFormat,
+          // 🚨 CHANGE APPLIED HERE: Increased left margin to 50 to visually center the content on the printed page
+          margin: const pw.EdgeInsets.only(left: 50, right: 40, top: 20, bottom: 0),
+
+          // HEADER remains the same
           header: (context) => pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
+              if (headerImg != null)
+                pw.Center(
+                  child: pw.Image(
+                    headerImg,
+                    fit: pw.BoxFit.fitWidth,
+                    height: 90,
+                  ),
+                ),
+              pw.SizedBox(height: 12),
               pw.Center(
                 child: pw.Text(
                   'SCHEDULE CHECKPOINT SUMMARY REPORT',
@@ -386,6 +417,49 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
               pw.SizedBox(height: 20),
             ],
           ),
+
+          // FOOTER remains the same
+          footer: (context) {
+            final isLastPage = context.pageNumber == context.pagesCount;
+
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                if (isLastPage)
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.only(top: 8, bottom: 8),
+                    child: pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.center,
+                      children: [
+                        pw.Column(
+                          children: [
+                            pw.Text('Prepared by:', style: const pw.TextStyle(fontSize: 11)),
+                            pw.SizedBox(height: 16),
+                            pw.Text(
+                              'PRINCE JUN N. DAMASCO',
+                              style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),),
+                            pw.Text('Head, Security Services', style: const pw.TextStyle(fontSize: 11)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                if (footerImg != null)
+                  pw.Center(
+                    child: pw.Image(
+                      footerImg,
+                      fit: pw.BoxFit.fitWidth,
+                      height: 60,
+                    ),
+                  )
+                else
+                  pw.SizedBox.shrink(),
+              ],
+            );
+          },
+
+          // BUILD remains the same
           build: (pw.Context context) {
             return [
               pw.TableHelper.fromTextArray(
@@ -419,36 +493,6 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
               ),
               pw.SizedBox(height: 20),
               pw.Text('Total Schedules: ${sortedScheduleData.length}'),
-              pw.SizedBox(height: 40),
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-                children: [
-                  pw.Align(
-                    alignment: pw.Alignment.centerLeft,
-                    child: pw.Text(
-                      'Prepared by:',
-                      style: const pw.TextStyle(fontSize: 11),
-                    ),
-                  ),
-                  pw.SizedBox(height: 20),
-                  pw.Align(
-                    alignment: pw.Alignment.center,
-                    child: pw.Column(
-                      children: [
-                        pw.Text(
-                          'PRINCE JUN N. DAMASCO',
-                          style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
-                        ),
-                        pw.SizedBox(height: 4),
-                        pw.Text(
-                          'Head, Security Services',
-                          style: const pw.TextStyle(fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
             ];
           },
         ),

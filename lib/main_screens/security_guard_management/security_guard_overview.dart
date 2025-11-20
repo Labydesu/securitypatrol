@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart' as pdf_core;
 import 'package:printing/printing.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import '../models/checkpoint_model.dart';
 import 'package:thesis_web/widgets/app_nav.dart';
 
@@ -35,20 +36,103 @@ class _SecurityGuardOverviewScreenState
   List<String> assignedCheckpointNames = [];
   List<CheckpointModel> assignedCheckpoints = [];
   bool _isPrinting = false;
+  pw.MemoryImage? _headerImage;
+  pw.MemoryImage? _footerImage;
+
+  Future<void> _loadReportAssets() async {
+    try {
+      final headerBytes = await rootBundle.load('assets/images/SecurityHeader.png');
+      _headerImage = pw.MemoryImage(headerBytes.buffer.asUint8List());
+    } catch (_) {}
+
+    try {
+      final footerBytes = await rootBundle.load('assets/images/SecurityFooter.png');
+      _footerImage = pw.MemoryImage(footerBytes.buffer.asUint8List());
+    } catch (_) {}
+  }
 
   Future<void> _printScheduledCheckpointsReport() async {
     if (assignedCheckpoints.isEmpty) return;
     setState(() { _isPrinting = true; });
     try {
+      // 1. Load assets if needed (assumes _loadReportAssets is available)
+      if (_headerImage == null || _footerImage == null) {
+        await _loadReportAssets();
+      }
       final pdf = pw.Document();
       final dateStr = DateFormat.yMMMMd().format(DateTime.now());
       final guard = widget.guardData;
       final guardName = ((guard['first_name'] ?? '') + ' ' + (guard['last_name'] ?? '')).trim();
 
+      // 🎯 DEFINITION FOR 8x13 INCH (LONG BOND) PAGE FORMAT
+      // This uses the correct 'pdf_core.' prefix for PdfPageFormat and PdfPageFormat.inch
+      const double longBondWidth = 8.0 * pdf_core.PdfPageFormat.inch;
+      const double longBondHeight = 13.0 * pdf_core.PdfPageFormat.inch;
+      final pdf_core.PdfPageFormat longBondPageFormat = pdf_core.PdfPageFormat(longBondWidth, longBondHeight);
+
+
       pdf.addPage(
         pw.MultiPage(
-          pageFormat: _longBondPageFormat,
-          margin: const pw.EdgeInsets.all(24),
+          // ✅ USING THE LOCALLY DEFINED VARIABLE 'longBondPageFormat'
+          pageFormat: longBondPageFormat,
+          margin: const pw.EdgeInsets.only(left: 24, right: 24, top: 20, bottom: 0),
+
+          // 1. HEADER: Image on every page
+          header: (context) => _headerImage != null
+              ? pw.Center(
+            child: pw.Image(
+              _headerImage!,
+              fit: pw.BoxFit.fitWidth,
+              height: 80,
+            ),
+          )
+              : pw.SizedBox.shrink(),
+
+          // 2. FOOTER: Signature (Last Page Only) and Image (Every Page)
+          footer: (context) {
+            final isLastPage = context.pageNumber == context.pagesCount;
+
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                // Signature Block (Only on Last Page and at the top of the footer area)
+                if (isLastPage)
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.only(top: 8, bottom: 8),
+                    child: pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.center,
+                      children: [
+                        pw.Column(
+                          children: [
+                            pw.Text('Prepared by:', style: const pw.TextStyle(fontSize: 11)),
+                            pw.SizedBox(height: 16),
+                            pw.Text(
+                              'PRINCE JUN N. DAMASCO',
+                              style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+                            ),
+                            pw.Text('Head, Security Services', style: const pw.TextStyle(fontSize: 11)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                // Footer Image (Every Page)
+                if (_footerImage != null)
+                  pw.Center(
+                    child: pw.Image(
+                      _footerImage!,
+                      fit: pw.BoxFit.fitWidth,
+                      height: 50,
+                    ),
+                  )
+                else
+                  pw.SizedBox.shrink(),
+              ],
+            );
+          },
+
+          // 3. BUILD: Main content only (no signature or redundant footer image)
           build: (pw.Context context) {
             return [
               pw.Row(
@@ -62,7 +146,8 @@ class _SecurityGuardOverviewScreenState
               pw.Text('Security Guard: ${guardName.isEmpty ? 'N/A' : guardName}', style: const pw.TextStyle(fontSize: 12)),
               pw.Text('Guard ID: ${guard['guard_id'] ?? 'N/A'}', style: const pw.TextStyle(fontSize: 12)),
               pw.SizedBox(height: 16),
-              pw.Table.fromTextArray(
+              // NOTE: Changing to TableHelper to address deprecation warning
+              pw.TableHelper.fromTextArray(
                 headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                 headers: ['Checkpoint', 'Location', 'Status'],
                 data: assignedCheckpoints.map((cp) => [
@@ -74,36 +159,7 @@ class _SecurityGuardOverviewScreenState
                 headerDecoration: const pw.BoxDecoration(color: pdf_core.PdfColors.grey300),
                 cellStyle: const pw.TextStyle(fontSize: 11),
               ),
-              pw.SizedBox(height: 40),
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-                children: [
-                  pw.Align(
-                    alignment: pw.Alignment.centerLeft,
-                    child: pw.Text(
-                      'Prepared by:',
-                      style: const pw.TextStyle(fontSize: 11),
-                    ),
-                  ),
-                  pw.SizedBox(height: 20),
-                  pw.Align(
-                    alignment: pw.Alignment.center,
-                    child: pw.Column(
-                      children: [
-                        pw.Text(
-                          'PRINCE JUN N. DAMASCO',
-                          style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
-                        ),
-                        pw.SizedBox(height: 4),
-                        pw.Text(
-                          'Head, Security Services',
-                          style: const pw.TextStyle(fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+              pw.SizedBox(height: 32),
             ];
           },
         ),
@@ -148,6 +204,7 @@ class _SecurityGuardOverviewScreenState
     } else {
       print("Overview initState: Guard ID seems present. Calling _loadScheduleStatus.");
       _loadScheduleStatus();
+      _loadReportAssets();
     }
   }
 
