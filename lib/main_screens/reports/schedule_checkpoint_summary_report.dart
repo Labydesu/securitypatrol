@@ -387,10 +387,7 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
         pw.MultiPage(
           theme: theme,
           pageFormat: pageFormat,
-          // 🚨 CHANGE APPLIED HERE: Increased left margin to 50 to visually center the content on the printed page
-          margin: const pw.EdgeInsets.only(left: 50, right: 40, top: 20, bottom: 0),
-
-          // HEADER remains the same
+          margin: const pw.EdgeInsets.only(left: 30, right: 30, top: 20, bottom: 10),
           header: (context) => pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
@@ -427,7 +424,7 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
               children: [
                 if (isLastPage)
                   pw.Padding(
-                    padding: const pw.EdgeInsets.only(top: 8, bottom: 8),
+                    padding: const pw.EdgeInsets.only(top: 8, bottom: 12),
                     child: pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.center,
                       children: [
@@ -592,9 +589,9 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
           // Fallback: try TransactionLogs without range filters
           try {
             final tlogs = await _firestore
-            .collection('TransactionLogs')
-            .where('checkpointId', isEqualTo: checkpointId.toString())
-            .get();
+                .collection('TransactionLogs')
+                .where('checkpointId', isEqualTo: checkpointId.toString())
+                .get();
             final day = DateTime.parse(scheduleDate);
             final startDay = DateTime(day.year, day.month, day.day);
             final endDay = startDay.add(const Duration(days: 1));

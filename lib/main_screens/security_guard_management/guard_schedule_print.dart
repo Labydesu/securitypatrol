@@ -376,7 +376,7 @@ class _GuardSchedulePrintScreenState extends State<GuardSchedulePrintScreen> {
         pw.MultiPage(
           theme: theme,
           pageFormat: pageFormat,
-          margin: const pw.EdgeInsets.only(left: 50, right: 40, top: 20, bottom: 0),
+          margin: const pw.EdgeInsets.only(left: 30, right: 30, top: 20, bottom: 10),
 
           header: (context) => pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -405,7 +405,7 @@ class _GuardSchedulePrintScreenState extends State<GuardSchedulePrintScreen> {
             // Conditional Signature Block
             final signatureBlock = (context.pageNumber == context.pagesCount)
                 ? pw.Padding(
-              padding: const pw.EdgeInsets.only(top: 8, bottom: 8),
+              padding: const pw.EdgeInsets.only(top: 8, bottom: 12),
               child: pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.center,
                 children: [

@@ -136,7 +136,7 @@ class _GuardListReportScreenState extends State<GuardListReportScreen> {
       pw.MultiPage(
         // ✅ Using the defined 8x13 page format
         pageFormat: _longBondPageFormat,
-        margin: const pw.EdgeInsets.only(left: 40, right: 40, top: 20, bottom: 0),
+        margin: const pw.EdgeInsets.only(left: 30, right: 30, top: 20, bottom: 10),
         // 🎯 HEADER IS ON EVERY PAGE
         header: (context) => headerImage != null
             ? pw.Center(
@@ -157,7 +157,7 @@ class _GuardListReportScreenState extends State<GuardListReportScreen> {
               // Signature Block (Only on Last Page)
               if (isLastPage)
                 pw.Padding(
-                  padding: const pw.EdgeInsets.only(top: 8, bottom: 8),
+                  padding: const pw.EdgeInsets.only(top: 8, bottom: 12),
                   child: pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.center,
                     children: [

@@ -134,7 +134,7 @@ class _CheckpointListReportScreenState extends State<CheckpointListReportScreen>
       pw.MultiPage(
         // ✅ Using the newly defined 8x13 page format
         pageFormat: _longBondPageFormat,
-        margin: const pw.EdgeInsets.only(left: 40, right: 40, top: 20, bottom: 0),
+        margin: const pw.EdgeInsets.only(left: 30, right: 30, top: 20, bottom: 10),
         header: (context) => headerImage != null
             ? pw.Center(
           child: pw.Image(
@@ -154,7 +154,7 @@ class _CheckpointListReportScreenState extends State<CheckpointListReportScreen>
               // Signature Block (Only on Last Page)
               if (isLastPage)
                 pw.Padding(
-                  padding: const pw.EdgeInsets.only(top: 8, bottom: 8),
+                  padding: const pw.EdgeInsets.only(top: 8, bottom: 12),
                   child: pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.center,
                     children: [
@@ -187,7 +187,6 @@ class _CheckpointListReportScreenState extends State<CheckpointListReportScreen>
             ],
           );
         },
-        // 🟢 MODIFIED BUILD: Main content only.
         build: (context) => [
           pw.Center(
             child: pw.Text(

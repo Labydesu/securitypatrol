@@ -75,7 +75,7 @@ class _SecurityGuardOverviewScreenState
         pw.MultiPage(
           // ✅ USING THE LOCALLY DEFINED VARIABLE 'longBondPageFormat'
           pageFormat: longBondPageFormat,
-          margin: const pw.EdgeInsets.only(left: 24, right: 24, top: 20, bottom: 0),
+          margin: const pw.EdgeInsets.only(left: 30, right: 30, top: 20, bottom: 10),
 
           // 1. HEADER: Image on every page
           header: (context) => _headerImage != null
@@ -98,7 +98,7 @@ class _SecurityGuardOverviewScreenState
                 // Signature Block (Only on Last Page and at the top of the footer area)
                 if (isLastPage)
                   pw.Padding(
-                    padding: const pw.EdgeInsets.only(top: 8, bottom: 8),
+                    padding: const pw.EdgeInsets.only(top: 8, bottom: 12),
                     child: pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.center,
                       children: [
