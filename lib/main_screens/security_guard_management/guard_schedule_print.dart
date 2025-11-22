@@ -7,6 +7,9 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:thesis_web/utils/download_saver.dart';
+import 'dart:typed_data';
 
 const PdfPageFormat _longBondPageFormat = PdfPageFormat(
   8.5 * PdfPageFormat.inch,
@@ -222,7 +225,7 @@ class _GuardSchedulePrintScreenState extends State<GuardSchedulePrintScreen> {
     });
   }
 
-  Future<void> _printSchedule() async {
+  Future<void> _exportCsv() async {
     if (!mounted) return;
     if (_selectedGuardId == null || _selectedGuardName == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -236,20 +239,45 @@ class _GuardSchedulePrintScreenState extends State<GuardSchedulePrintScreen> {
 
       if (scheduleData.isEmpty && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No schedule data to print for the selected period')),
+          const SnackBar(content: Text('No schedule data to export for the selected period')),
         );
         return;
       }
 
-      final reportText = _generateTextReport(scheduleData);
-      if (mounted) {
-        _showReportDialog(reportText);
+      final buffer = StringBuffer();
+      buffer.writeln('Date,Start Time,End Time,Status');
+      for (final schedule in scheduleData) {
+        final statusText = schedule['type'] == 'EndedSchedules' ? 'ENDED' : 'ACTIVE';
+        String esc(String v) => '"${v.replaceAll('"', '""')}"';
+        buffer.writeln([
+          esc(schedule['date'] as String? ?? ''),
+          esc(schedule['start_time'] as String? ?? ''),
+          esc(schedule['end_time'] as String? ?? ''),
+          esc(statusText),
+        ].join(','));
+      }
+
+      final bytes = Uint8List.fromList(buffer.toString().codeUnits);
+      final fileName = 'Guard_Schedule_${_selectedGuardName?.replaceAll(' ', '_')}_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.csv';
+
+      if (kIsWeb) {
+        await saveBytesAsDownload(fileName, bytes, mimeType: 'text/csv');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('CSV downloaded')));
+        }
+      } else {
+        // For non-web platforms, you might want to add file saving logic here
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('CSV export is only available on web')),
+          );
+        }
       }
 
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error generating report: $e')),
+          SnackBar(content: Text('Error generating CSV: $e')),
         );
       }
     }
@@ -331,67 +359,6 @@ class _GuardSchedulePrintScreenState extends State<GuardSchedulePrintScreen> {
     return allSchedules;
   }
 
-  String _generateTextReport(List<Map<String, dynamic>> scheduleData) {
-    final buffer = StringBuffer();
-    final String periodString;
-
-    if (_periodType == 'Monthly') {
-      periodString = DateFormat('MMMM yyyy').format(_anchorDate);
-    } else {
-      final startOfWeek = _anchorDate.subtract(Duration(days: _anchorDate.weekday - 1));
-      final endOfWeek = startOfWeek.add(const Duration(days: 6));
-      periodString = '${DateFormat('MMM d').format(startOfWeek)} - ${DateFormat('MMM d, yyyy').format(endOfWeek)}';
-    }
-
-    buffer.writeln('SECURITY GUARD SCHEDULE REPORT');
-    buffer.writeln('=' * 40);
-    buffer.writeln('Guard: ${_selectedGuardName ?? 'Unknown'}');
-    buffer.writeln('Period: $periodString');
-    buffer.writeln('Schedule Type: $_scheduleType');
-    buffer.writeln('Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}');
-    buffer.writeln();
-
-    buffer.writeln('Date\t\tStart\t\tEnd');
-    buffer.writeln('-' * 40);
-
-    if(scheduleData.isEmpty) {
-      buffer.writeln('No schedules found for this period.');
-    } else {
-      for (final schedule in scheduleData) {
-        buffer.writeln('${schedule['date']}\t${schedule['start_time']}\t${schedule['end_time']}');
-      }
-    }
-
-    buffer.writeln();
-    buffer.writeln('Total Shifts: ${scheduleData.length}');
-
-    return buffer.toString();
-  }
-
-  void _showReportDialog(String reportText) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Schedule Report'),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 400,
-          child: SingleChildScrollView(
-            child: Text(
-              reportText,
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
 
   Future<void> _generateAndPrintPDF(List<Map<String, dynamic>> scheduleData) async {
     try {
@@ -770,7 +737,7 @@ class _GuardSchedulePrintScreenState extends State<GuardSchedulePrintScreen> {
                        children: [
                          Container(
                            decoration: BoxDecoration(
-                             color: Colors.blue,
+                             color: Colors.orange,
                              borderRadius: BorderRadius.circular(8),
                              boxShadow: [
                                BoxShadow(
@@ -782,11 +749,11 @@ class _GuardSchedulePrintScreenState extends State<GuardSchedulePrintScreen> {
                              ],
                            ),
                            child: ElevatedButton.icon(
-                           icon: const Icon(Icons.text_snippet),
-                           label: const Text('Text Report'),
-                           onPressed: _printSchedule,
+                           icon: const Icon(Icons.table_chart),
+                           label: const Text('CSV Report'),
+                           onPressed: _exportCsv,
                            style: ElevatedButton.styleFrom(
-                             backgroundColor: Colors.blue,
+                               backgroundColor: Colors.orange,
                              foregroundColor: Colors.white,
                                elevation: 0,
                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
