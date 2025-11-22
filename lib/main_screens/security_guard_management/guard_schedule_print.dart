@@ -240,6 +240,12 @@ class _GuardSchedulePrintScreenState extends State<GuardSchedulePrintScreen> {
         );
         return;
       }
+
+      final reportText = _generateTextReport(scheduleData);
+      if (mounted) {
+        _showReportDialog(reportText);
+      }
+
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -325,6 +331,67 @@ class _GuardSchedulePrintScreenState extends State<GuardSchedulePrintScreen> {
     return allSchedules;
   }
 
+  String _generateTextReport(List<Map<String, dynamic>> scheduleData) {
+    final buffer = StringBuffer();
+    final String periodString;
+
+    if (_periodType == 'Monthly') {
+      periodString = DateFormat('MMMM yyyy').format(_anchorDate);
+    } else {
+      final startOfWeek = _anchorDate.subtract(Duration(days: _anchorDate.weekday - 1));
+      final endOfWeek = startOfWeek.add(const Duration(days: 6));
+      periodString = '${DateFormat('MMM d').format(startOfWeek)} - ${DateFormat('MMM d, yyyy').format(endOfWeek)}';
+    }
+
+    buffer.writeln('SECURITY GUARD SCHEDULE REPORT');
+    buffer.writeln('=' * 40);
+    buffer.writeln('Guard: ${_selectedGuardName ?? 'Unknown'}');
+    buffer.writeln('Period: $periodString');
+    buffer.writeln('Schedule Type: $_scheduleType');
+    buffer.writeln('Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}');
+    buffer.writeln();
+
+    buffer.writeln('Date\t\tStart\t\tEnd');
+    buffer.writeln('-' * 40);
+
+    if(scheduleData.isEmpty) {
+      buffer.writeln('No schedules found for this period.');
+    } else {
+      for (final schedule in scheduleData) {
+        buffer.writeln('${schedule['date']}\t${schedule['start_time']}\t${schedule['end_time']}');
+      }
+    }
+
+    buffer.writeln();
+    buffer.writeln('Total Shifts: ${scheduleData.length}');
+
+    return buffer.toString();
+  }
+
+  void _showReportDialog(String reportText) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Schedule Report'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 400,
+          child: SingleChildScrollView(
+            child: Text(
+              reportText,
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _generateAndPrintPDF(List<Map<String, dynamic>> scheduleData) async {
     try {

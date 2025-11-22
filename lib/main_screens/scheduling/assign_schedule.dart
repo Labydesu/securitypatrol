@@ -19,9 +19,11 @@ class _AssignScheduleScreenState extends State<AssignScheduleScreen> {
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
   // Period selection for daily assignment
-  String _periodType = 'Single Day'; // Single Day, Range
+  String _periodType = 'Single Day'; // Single Day, Range, Multiple Days
   DateTimeRange? _customRange;
   final List<DateTime> _selectedDates = [];
+  // Store multiple selected dates for "Multiple Days" mode
+  final Set<DateTime> _multipleSelectedDates = {};
   // Stores selected user-facing guard IDs (Accounts.guard_id)
   List<String> selectedGuardIds = [];
   final TextEditingController searchController = TextEditingController();
@@ -68,8 +70,18 @@ class _AssignScheduleScreenState extends State<AssignScheduleScreen> {
         _selectedDates.add(d);
         d = d.add(const Duration(days: 1));
       }
+    } else if (_periodType == 'Multiple Days') {
+      // For Multiple Days mode, use the stored set of selected dates
+      _selectedDates.addAll(_multipleSelectedDates);
     }
     setState(() {});
+  }
+
+  // Helper to check if a date is selected in Multiple Days mode
+  bool _isDateSelected(DateTime date) {
+    final normalized = DateTime(date.year, date.month, date.day);
+    return _multipleSelectedDates.any((d) => 
+      d.year == normalized.year && d.month == normalized.month && d.day == normalized.day);
   }
 
   Future<void> _fetchGuards() async {
@@ -322,12 +334,20 @@ class _AssignScheduleScreenState extends State<AssignScheduleScreen> {
   }
 
   Future<void> assignSchedule() async {
-    if ((_selectedDay == null && _periodType != 'Range') ||
+    if ((_selectedDay == null && _periodType != 'Range' && _periodType != 'Multiple Days') ||
         _startTime == null ||
         _endTime == null ||
         selectedGuardIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please complete all fields.')),
+      );
+      return;
+    }
+    
+    // Validate Multiple Days mode has at least one date selected
+    if (_periodType == 'Multiple Days' && _multipleSelectedDates.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select at least one date in Multiple Days mode.')),
       );
       return;
     }
@@ -566,14 +586,33 @@ class _AssignScheduleScreenState extends State<AssignScheduleScreen> {
                     firstDay: DateTime.utc(DateTime.now().year, DateTime.now().month, DateTime.now().day),
                     lastDay: DateTime.utc(2100, 12, 31),
                     focusedDay: _focusedDay,
-                    selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                    selectedDayPredicate: (day) {
+                      if (_periodType == 'Multiple Days') {
+                        return _isDateSelected(day);
+                      } else {
+                        return isSameDay(_selectedDay, day);
+                      }
+                    },
                     onDaySelected: (selectedDay, focusedDay) {
                       final today = DateTime.now();
                       final startOfToday = DateTime(today.year, today.month, today.day);
                       if (!selectedDay.isBefore(startOfToday)) {
                         setState(() {
-                          _selectedDay = selectedDay;
-                          _focusedDay = focusedDay;
+                          if (_periodType == 'Multiple Days') {
+                            // Toggle date selection in Multiple Days mode
+                            final normalized = DateTime(selectedDay.year, selectedDay.month, selectedDay.day);
+                            if (_isDateSelected(selectedDay)) {
+                              _multipleSelectedDates.removeWhere((d) => 
+                                d.year == normalized.year && d.month == normalized.month && d.day == normalized.day);
+                            } else {
+                              _multipleSelectedDates.add(normalized);
+                            }
+                            _populateSelectedDates();
+                          } else {
+                            _selectedDay = selectedDay;
+                            _focusedDay = focusedDay;
+                            _populateSelectedDates();
+                          }
                         });
                         // Fetch assigned checkpoints and guard schedules for the selected date
                         final dateStr = DateFormat('yyyy-MM-dd').format(selectedDay);
@@ -606,7 +645,31 @@ class _AssignScheduleScreenState extends State<AssignScheduleScreen> {
                       ChoiceChip(
                         label: const Text('Single Day'),
                         selected: _periodType == 'Single Day',
-                        onSelected: (_) { setState(() { _periodType = 'Single Day'; _populateSelectedDates(); }); },
+                        onSelected: (_) { 
+                          setState(() { 
+                            _periodType = 'Single Day'; 
+                            _multipleSelectedDates.clear();
+                            _populateSelectedDates(); 
+                          }); 
+                        },
+                      ),
+                      ChoiceChip(
+                        label: const Text('Multiple Days'),
+                        selected: _periodType == 'Multiple Days',
+                        onSelected: (_) { 
+                          setState(() { 
+                            _periodType = 'Multiple Days'; 
+                            _customRange = null;
+                            // Initialize with current selected day if any
+                            if (_selectedDay != null) {
+                              final normalized = DateTime(_selectedDay!.year, _selectedDay!.month, _selectedDay!.day);
+                              if (!_isDateSelected(_selectedDay!)) {
+                                _multipleSelectedDates.add(normalized);
+                              }
+                            }
+                            _populateSelectedDates(); 
+                          }); 
+                        },
                       ),
                       ChoiceChip(
                         label: const Text('Date Range'),
@@ -620,9 +683,17 @@ class _AssignScheduleScreenState extends State<AssignScheduleScreen> {
                             lastDate: DateTime(now.year + 3),
                           );
                           if (picked != null) {
-                            setState(() { _customRange = picked; _populateSelectedDates(); });
+                            setState(() { 
+                              _customRange = picked; 
+                              _multipleSelectedDates.clear();
+                              _populateSelectedDates(); 
+                            });
                           } else {
-                            setState(() { _periodType = 'Single Day'; _customRange = null; _populateSelectedDates(); });
+                            setState(() { 
+                              _periodType = 'Single Day'; 
+                              _customRange = null; 
+                              _populateSelectedDates(); 
+                            });
                           }
                         },
                       ),
@@ -630,7 +701,32 @@ class _AssignScheduleScreenState extends State<AssignScheduleScreen> {
                   ),
                   if (_selectedDates.isNotEmpty) ...[
                     const SizedBox(height: 8),
-                    Text('Selected days: ${_selectedDates.length}', style: Theme.of(context).textTheme.bodyMedium),
+                    Text(
+                      _periodType == 'Multiple Days'
+                          ? 'Selected days: ${_multipleSelectedDates.length} (Tap dates on calendar to select/deselect)'
+                          : 'Selected days: ${_selectedDates.length}',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    if (_periodType == 'Multiple Days' && _multipleSelectedDates.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 4,
+                        runSpacing: 4,
+                        children: [
+                          ...(_multipleSelectedDates.toList()..sort((a, b) => a.compareTo(b)))
+                            .map<Widget>((date) => Chip(
+                              label: Text(DateFormat('MMM dd').format(date)),
+                              onDeleted: () {
+                                setState(() {
+                                  _multipleSelectedDates.removeWhere((d) => 
+                                    d.year == date.year && d.month == date.month && d.day == date.day);
+                                  _populateSelectedDates();
+                                });
+                              },
+                            )),
+                        ],
+                      ),
+                    ],
                   ],
                   Text('Select Time:', style: Theme.of(context).textTheme.titleLarge),
                   const SizedBox(height: 8),
