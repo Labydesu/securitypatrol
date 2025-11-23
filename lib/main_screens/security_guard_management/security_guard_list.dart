@@ -460,18 +460,20 @@ class _SecurityGuardListScreenState extends State<SecurityGuardListScreen> {
           await _updateStatusesBasedOnSchedule();
         }
       },
-      child: Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minWidth: MediaQuery.of(context).size.width - 32, // Account for padding
-            ),
-            child: DataTable(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.vertical,
+        child: Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minWidth: MediaQuery.of(context).size.width - 32, // Account for padding
+              ),
+              child: DataTable(
               headingRowHeight: 56,
               dataRowMinHeight: 64,
               dataRowMaxHeight: 72,
@@ -639,6 +641,7 @@ class _SecurityGuardListScreenState extends State<SecurityGuardListScreen> {
             }).toList(),
             ),
           ),
+        ),
         ),
       ),
     );
