@@ -394,15 +394,6 @@ class _AddCheckpointScreenState extends State<AddCheckpointScreen> {
                   return null;
                 },
               ),
-              if (!_isEditMode)
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: _suggestAndPrefillNextCheckpointId,
-                    icon: const Icon(Icons.autorenew),
-                    label: const Text('Suggest next ID'),
-                  ),
-                ),
               _buildTextField(
                 controller: _nameController,
                 label: 'Checkpoint Name',
