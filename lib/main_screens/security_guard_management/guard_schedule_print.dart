@@ -9,6 +9,7 @@ import 'package:printing/printing.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:thesis_web/utils/download_saver.dart';
+import 'package:thesis_web/utils/guard_name_utils.dart';
 import 'dart:typed_data';
 
 const PdfPageFormat _longBondPageFormat = PdfPageFormat(
@@ -110,15 +111,30 @@ class _GuardSchedulePrintScreenState extends State<GuardSchedulePrintScreen> {
     final guards = snap.docs.map((d) {
       final data = d.data();
       final guardId = (data['guard_id'] as String?) ?? d.id;
-      final firstName = data['first_name'] as String? ?? '';
-      final lastName = data['last_name'] as String? ?? '';
-      final name = ('$firstName $lastName').trim().isEmpty
-          ? (data['name'] as String?) ?? 'Unnamed Guard'
-          : ('$firstName $lastName').trim();
-      return {'id': guardId, 'name': name};
+      final firstName = (data['first_name'] as String? ?? '').trim();
+      final lastName = (data['last_name'] as String? ?? '').trim();
+      final name = GuardNameUtils.format(
+        firstName: firstName,
+        lastName: lastName,
+        fallbackName: data['name'] as String?,
+      );
+      return {
+        'id': guardId,
+        'name': name,
+        'first_name': firstName,
+        'last_name': lastName,
+        'fallback_name': (data['name'] as String?) ?? '',
+      };
     }).toList();
 
-    guards.sort((a, b) => (a['name'] ?? '').compareTo(b['name'] ?? ''));
+    guards.sort((a, b) => GuardNameUtils.compareAsc(
+          aFirstName: a['first_name'],
+          aLastName: a['last_name'],
+          bFirstName: b['first_name'],
+          bLastName: b['last_name'],
+          aFallbackName: a['fallback_name'],
+          bFallbackName: b['fallback_name'],
+        ));
     return guards;
   }
 

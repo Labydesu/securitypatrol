@@ -24,6 +24,7 @@ import 'package:thesis_web/main_screens/reports/schedule_checkpoint_summary_repo
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:ui' as ui;
 import 'package:thesis_web/services/guard_status_service.dart';
+import 'package:thesis_web/utils/guard_name_utils.dart';
 
 class _MissRateItem {
   final CheckpointModel cp;
@@ -441,11 +442,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       for (final accountDoc in accountsSnap.docs) {
         final data = accountDoc.data(); // No need to cast if rules ensure structure
         final String guardIdField = (data['guard_id'] as String?) ?? accountDoc.id; // Fallback to doc ID if guard_id field is missing
-        final String firstName = data['first_name'] as String? ?? '';
-        final String lastName = data['last_name'] as String? ?? '';
-        final String guardName = ('$firstName $lastName').trim().isEmpty
-            ? (data['name'] as String?) ?? 'Unnamed Guard' // Fallback to 'name' field
-            : ('$firstName $lastName').trim();
+        final String guardName = GuardNameUtils.format(
+          firstName: data['first_name'] as String?,
+          lastName: data['last_name'] as String?,
+          fallbackName: data['name'] as String?,
+        );
 
         String startTime = 'N/A';
         String endTime = 'N/A';
@@ -485,6 +486,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           shiftTimeDisplay: shiftDisplay ?? (startTime != 'N/A' ? 'Time N/A' : 'No Shift Today'),
         ));
       }
+      result.sort((a, b) => a.guardName.toLowerCase().compareTo(b.guardName.toLowerCase()));
       return result;
     }).handleError((error, stackTrace) {
       print('[OnDutyStream] Error: $error\n$stackTrace');

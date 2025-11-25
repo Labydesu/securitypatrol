@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:thesis_web/services/app_logger.dart';
 import 'package:thesis_web/main_screens/security_guard_management/security_guard_list.dart';
 import 'package:thesis_web/widgets/app_nav.dart';
+import 'package:thesis_web/utils/guard_name_utils.dart';
 
 class AssignScheduleScreen extends StatefulWidget {
   const AssignScheduleScreen({super.key});
@@ -97,13 +98,34 @@ class _AssignScheduleScreenState extends State<AssignScheduleScreen> {
       if (mounted) {
         setState(() {
           allGuards = snapshot.docs
-              .map((doc) => {
-                    'doc_id': doc.id,
-                    'guard_id': (doc.data()['guard_id'] ?? '').toString(),
-                    'name': '${doc['first_name'] ?? ''} ${doc['last_name'] ?? ''}'.trim(),
-                  })
+              .map((doc) {
+                final data = doc.data();
+                final firstName = (data['first_name'] ?? '').toString().trim();
+                final lastName = (data['last_name'] ?? '').toString().trim();
+                final formattedName = GuardNameUtils.format(
+                  firstName: firstName,
+                  lastName: lastName,
+                  fallbackName: data['name']?.toString(),
+                );
+                return {
+                  'doc_id': doc.id,
+                  'guard_id': (data['guard_id'] ?? '').toString(),
+                  'name': formattedName,
+                  'first_name': firstName,
+                  'last_name': lastName,
+                  'fallback_name': (data['name'] ?? '').toString(),
+                };
+              })
               .where((guard) => guard['name'].toString().isNotEmpty)
-              .toList();
+              .toList()
+            ..sort((a, b) => GuardNameUtils.compareAsc(
+                  aFirstName: a['first_name'],
+                  aLastName: a['last_name'],
+                  bFirstName: b['first_name'],
+                  bLastName: b['last_name'],
+                  aFallbackName: a['fallback_name'],
+                  bFallbackName: b['fallback_name'],
+                ));
           // Build lookup map for reliable name resolution during logging
           _guardIdToName = {
             for (final g in allGuards)

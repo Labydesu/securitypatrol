@@ -7,6 +7,7 @@ import 'package:printing/printing.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import '../models/checkpoint_model.dart';
 import 'package:thesis_web/widgets/app_nav.dart';
+import 'package:thesis_web/utils/guard_name_utils.dart';
 
 const pdf_core.PdfPageFormat _longBondPageFormat = pdf_core.PdfPageFormat(
   8.5 * pdf_core.PdfPageFormat.inch,
@@ -62,7 +63,11 @@ class _SecurityGuardOverviewScreenState
       final pdf = pw.Document();
       final dateStr = DateFormat.yMMMMd().format(DateTime.now());
       final guard = widget.guardData;
-      final guardName = ((guard['first_name'] ?? '') + ' ' + (guard['last_name'] ?? '')).trim();
+      final guardName = GuardNameUtils.format(
+        firstName: guard['first_name'] as String?,
+        lastName: guard['last_name'] as String?,
+        fallbackName: guard['name'] as String?,
+      );
 
       // 🎯 DEFINITION FOR 8x13 INCH (LONG BOND) PAGE FORMAT
       // This uses the correct 'pdf_core.' prefix for PdfPageFormat and PdfPageFormat.inch
@@ -442,9 +447,11 @@ class _SecurityGuardOverviewScreenState
     final guard = widget.guardData;
     final theme = Theme.of(context);
 
-    final firstName = guard['first_name'] as String? ?? 'N/A';
-    final lastName = guard['last_name'] as String? ?? '';
-    final fullName = ('$firstName $lastName').trim();
+    final fullName = GuardNameUtils.format(
+      firstName: guard['first_name'] as String?,
+      lastName: guard['last_name'] as String?,
+      fallbackName: guard['name'] as String?,
+    );
 
     final bool isActuallyOnDuty = status == 'On Duty';
     final statusColor = isActuallyOnDuty ? Colors.green.shade700 : Colors.red.shade700;

@@ -50,20 +50,42 @@ class _GuardListReportScreenState extends State<GuardListReportScreen> {
           .get();
       final rows = snap.docs.map((d) {
         final data = d.data();
-        final first = data['first_name'] as String? ?? '';
-        final last = data['last_name'] as String? ?? '';
-        final name = ('$first $last').trim().isEmpty
-            ? (data['name'] as String? ?? 'Unnamed Guard')
-            : ('$first $last').trim();
+        final first = (data['first_name'] as String? ?? '').trim();
+        final last = (data['last_name'] as String? ?? '').trim();
+
+        String fallbackName = (data['name'] as String? ?? 'Unnamed Guard').trim();
+        if (fallbackName.isEmpty) {
+          fallbackName = 'Unnamed Guard';
+        }
+
+        final hasStructuredName = first.isNotEmpty || last.isNotEmpty;
+        final formattedName = hasStructuredName
+            ? [last, first].where((part) => part.isNotEmpty).join(' ')
+            : fallbackName;
+
         return {
           'id': d.id,
           'guard_id': data['guard_id'] as String? ?? d.id,
-          'name': name,
+          'name': formattedName,
+          'first_name': first,
+          'last_name': last,
           'position': (data['position'] as String?) ?? (data['job_title'] as String?) ?? '-',
           'email': data['email'] as String? ?? '-',
         };
       }).toList();
-      rows.sort((a, b) => (a['name'] as String).compareTo(b['name'] as String));
+      rows.sort((a, b) {
+        final aLast = (a['last_name'] as String?)?.toLowerCase() ?? '';
+        final bLast = (b['last_name'] as String?)?.toLowerCase() ?? '';
+        final lastCompare = aLast.compareTo(bLast);
+        if (lastCompare != 0) return lastCompare;
+
+        final aFirst = (a['first_name'] as String?)?.toLowerCase() ?? '';
+        final bFirst = (b['first_name'] as String?)?.toLowerCase() ?? '';
+        final firstCompare = aFirst.compareTo(bFirst);
+        if (firstCompare != 0) return firstCompare;
+
+        return (a['name'] as String).compareTo(b['name'] as String);
+      });
       setState(() {
         _guards = rows;
       });

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:thesis_web/main_screens/security_guard_management/security_guard_overview.dart';
 import 'dart:async';
 import 'package:intl/intl.dart';
 import 'package:thesis_web/main_screens/security_guard_management/add_edit_guard_screen.dart';
 import 'package:thesis_web/widgets/app_nav.dart';
+import 'package:thesis_web/utils/guard_name_utils.dart';
 
 class SecurityGuardListScreen extends StatefulWidget {
   const SecurityGuardListScreen({super.key});
@@ -81,6 +81,8 @@ class _SecurityGuardListScreenState extends State<SecurityGuardListScreen> {
         };
       }).toList();
 
+      _sortGuardsByLastName(guards);
+
       if (mounted) {
         setState(() {
           _allGuards = guards;
@@ -110,10 +112,7 @@ class _SecurityGuardListScreenState extends State<SecurityGuardListScreen> {
         _filteredGuards = List.from(_allGuards);
       } else {
         _filteredGuards = _allGuards.where((guard) {
-          final fullName =
-          '${guard['first_name'] as String? ?? ''} ${guard['last_name'] as String? ?? ''}'
-              .toLowerCase()
-              .trim();
+          final fullName = _formatGuardName(guard).toLowerCase();
           final guardDocumentId = (guard['id'] as String? ?? '').toLowerCase();
           final userFacingGuardId = (guard['guard_id'] as String? ?? '').toLowerCase();
 
@@ -122,6 +121,7 @@ class _SecurityGuardListScreenState extends State<SecurityGuardListScreen> {
               userFacingGuardId.contains(query);
         }).toList();
       }
+      _sortGuardsByLastName(_filteredGuards);
     });
   }
 
@@ -212,6 +212,7 @@ class _SecurityGuardListScreenState extends State<SecurityGuardListScreen> {
       }
 
       if (needsFirestoreUpdate) {
+        _sortGuardsByLastName(updatedGuardsList);
         await batch.commit();
         if (mounted) {
           setState(() {
@@ -532,7 +533,7 @@ class _SecurityGuardListScreenState extends State<SecurityGuardListScreen> {
               ),
             ],
             rows: _filteredGuards.map((guard) {
-              final fullName = '${guard['first_name'] as String? ?? 'N/A'} ${guard['last_name'] as String? ?? ''}'.trim();
+              final fullName = _formatGuardName(guard);
               final status = guard['status'] as String? ?? 'Unknown';
               final guardDisplayId = guard['guard_id'] as String? ?? 'N/A';
               final guardDocumentId = guard['id'] as String;
@@ -647,3 +648,52 @@ class _SecurityGuardListScreenState extends State<SecurityGuardListScreen> {
     );
   }
 }
+
+  String _formatGuardName(Map<String, dynamic> guard) {
+    return GuardNameUtils.format(
+      firstName: guard['first_name'] as String?,
+      lastName: guard['last_name'] as String?,
+      fallbackName: guard['name'] as String?,
+    );
+  }
+
+  void _sortGuardsByLastName(List<Map<String, dynamic>> guards) {
+    guards.sort((a, b) {
+      final compare = GuardNameUtils.compareAsc(
+        aFirstName: a['first_name'] as String?,
+        aLastName: a['last_name'] as String?,
+        bFirstName: b['first_name'] as String?,
+        bLastName: b['last_name'] as String?,
+        aFallbackName: a['name'] as String?,
+        bFallbackName: b['name'] as String?,
+      );
+
+      if (compare != 0) {
+        return compare;
+      }
+
+      final aDate = _parseCreatedAt(a['createdAt']);
+      final bDate = _parseCreatedAt(b['createdAt']);
+
+      if (aDate == null && bDate == null) return 0;
+      if (aDate == null) return 1;
+      if (bDate == null) return -1;
+
+      return bDate.compareTo(aDate);
+    });
+  }
+
+  DateTime? _parseCreatedAt(dynamic value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+
+    if (value is String) {
+      try {
+        return DateTime.parse(value);
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
+  }

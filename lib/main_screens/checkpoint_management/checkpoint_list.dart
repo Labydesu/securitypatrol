@@ -5,6 +5,7 @@ import 'package:thesis_web/main_screens/checkpoint_management/add_checkpoint.dar
 import 'package:thesis_web/main_screens/models/checkpoint_model.dart';
 import 'package:thesis_web/services/app_logger.dart';
 import 'package:thesis_web/widgets/app_nav.dart';
+import 'package:thesis_web/utils/guard_name_utils.dart';
 
 
 class CheckpointListScreen extends StatefulWidget {
@@ -35,10 +36,11 @@ class _CheckpointListScreenState extends State<CheckpointListScreen> {
         return null;
       }
       final data = snap.docs.first.data();
-      final first = (data['first_name'] as String?) ?? '';
-      final last = (data['last_name'] as String?) ?? '';
-      final fallback = (data['name'] as String?) ?? '';
-      final name = ('$first $last').trim().isNotEmpty ? ('$first $last').trim() : (fallback.isNotEmpty ? fallback : null);
+      final name = GuardNameUtils.format(
+        firstName: data['first_name'] as String?,
+        lastName: data['last_name'] as String?,
+        fallbackName: data['name'] as String?,
+      );
       _guardNameCache[guardId] = name;
       return name;
     } catch (_) {

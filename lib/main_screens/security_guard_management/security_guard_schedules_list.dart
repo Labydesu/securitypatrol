@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'security_guard_overview.dart';
+import 'package:thesis_web/utils/guard_name_utils.dart';
 
 class SecurityGuardSchedulesListScreen extends StatelessWidget {
   const SecurityGuardSchedulesListScreen({super.key});
@@ -45,6 +46,14 @@ class SecurityGuardSchedulesListScreen extends StatelessWidget {
           'today_end_time': end,
         });
       }
+      results.sort((a, b) => GuardNameUtils.compareAsc(
+            aFirstName: a['first_name'] as String?,
+            aLastName: a['last_name'] as String?,
+            bFirstName: b['first_name'] as String?,
+            bLastName: b['last_name'] as String?,
+            aFallbackName: a['name'] as String?,
+            bFallbackName: b['name'] as String?,
+          ));
       return results;
     });
   }
@@ -75,8 +84,11 @@ class SecurityGuardSchedulesListScreen extends StatelessWidget {
             itemCount: guards.length,
             itemBuilder: (context, index) {
               final g = guards[index];
-              final fullName =
-                  '${(g['first_name'] as String?) ?? 'N/A'} ${(g['last_name'] as String?) ?? ''}'.trim();
+              final fullName = GuardNameUtils.format(
+                firstName: g['first_name'] as String?,
+                lastName: g['last_name'] as String?,
+                fallbackName: g['name'] as String?,
+              );
               final pos = (g['position'] as String?) ?? 'N/A';
               final guardDisplayId = (g['guard_id'] as String?) ?? 'N/A';
               final shift = (g['today_start_time'] != null && g['today_end_time'] != null)

@@ -11,11 +11,7 @@ import 'package:thesis_web/utils/download_saver.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-
-const PdfPageFormat _longBondPageFormat = PdfPageFormat(
-  8.5 * PdfPageFormat.inch,
-  13 * PdfPageFormat.inch,
-);
+import 'package:thesis_web/utils/guard_name_utils.dart';
 
 class ScheduleCheckpointSummaryReportScreen extends StatefulWidget {
   const ScheduleCheckpointSummaryReportScreen({super.key});
@@ -68,18 +64,30 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
     final guards = guardsQuery.docs.map((doc) {
       final data = doc.data();
       final guardId = (data['guard_id'] as String?) ?? doc.id;
-      final firstName = data['first_name'] as String? ?? '';
-      final lastName = data['last_name'] as String? ?? '';
-      final name = ('$firstName $lastName').trim().isEmpty
-          ? (data['name'] as String?) ?? 'Unnamed Guard'
-          : ('$firstName $lastName').trim();
+      final firstName = (data['first_name'] as String? ?? '').trim();
+      final lastName = (data['last_name'] as String? ?? '').trim();
+      final name = GuardNameUtils.format(
+        firstName: firstName,
+        lastName: lastName,
+        fallbackName: data['name'] as String?,
+      );
       return {
         'id': guardId,
         'name': name,
+        'first_name': firstName,
+        'last_name': lastName,
+        'fallback_name': (data['name'] as String?) ?? '',
       };
     }).toList();
 
-    guards.sort((a, b) => a['name']!.compareTo(b['name']!));
+    guards.sort((a, b) => GuardNameUtils.compareAsc(
+          aFirstName: a['first_name'],
+          aLastName: a['last_name'],
+          bFirstName: b['first_name'],
+          bLastName: b['last_name'],
+          aFallbackName: a['fallback_name'],
+          bFallbackName: b['fallback_name'],
+        ));
     return guards;
   }
 
@@ -236,7 +244,11 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
 
     for (final schedule in scheduleData) {
       final checkpoints = schedule['checkpoints'] as List<Map<String, dynamic>>? ?? [];
-      final checkpointText = checkpoints.map((cp) => '${cp['id']} (${cp['status']})').join(', ');
+      final checkpointText = checkpoints.map((cp) {
+        final remarks = (cp['remarks'] as String? ?? '').trim();
+        final remarksText = remarks.isNotEmpty ? ' | Remarks: $remarks' : '';
+        return '${cp['id']} (${cp['status']})$remarksText';
+      }).join(', ');
       buffer.writeln('${schedule['date']}\t\t$checkpointText');
     }
 
@@ -314,7 +326,9 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
                 ? 'Inspected'
                 : 'Not Yet Inspected';
             final location = (cp['location'] as String? ?? cp['name'] as String? ?? cp['id'] as String? ?? 'Unknown');
-            return '$location ($statusLabel)';
+            final remarks = (cp['remarks'] as String? ?? '').trim();
+            final remarksText = remarks.isNotEmpty ? ' | Remarks: $remarks' : '';
+            return '$location ($statusLabel)$remarksText';
           })
           .join('; ');
       String esc(String v) => '"${v.replaceAll('"', '""')}"';
@@ -483,7 +497,9 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
                     final statusLabel = rawStatus == 'scanned'
                         ? 'Inspected$timeLabel'
                         : 'Not Yet Inspected';
-                    return '$location ($statusLabel)';
+                    final remarks = (cp['remarks'] as String? ?? '').trim();
+                    final remarksText = remarks.isNotEmpty ? ' • Remarks: $remarks' : '';
+                    return '$location ($statusLabel)$remarksText';
                   }).join(',\n');
                   return [schedule['date'] as String, checkpointText];
                 }).toList(),
@@ -536,9 +552,9 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
       try {
         final checkpointDoc = await _firestore.collection('Checkpoints').doc(checkpointId.toString()).get();
 
-        final String name;
-        final String location;
-        final String docId;
+        String name;
+        String location;
+        String docId;
 
         if (checkpointDoc.exists) {
           final checkpointData = checkpointDoc.data()!;
@@ -558,6 +574,7 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
         // Fetch scans for this checkpoint and filter by day (and guard if available) client-side.
         bool isScanned = false;
         DateTime? scannedAtTime;
+        String? latestRemark;
         try {
           final scansSnap = await _firestore
               .collection('CheckpointScans')
@@ -581,6 +598,10 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
               if (guardId == null || guardId.isEmpty || scanGuard == null || scanGuard.isEmpty || scanGuard == guardId) {
                 isScanned = true;
                 scannedAtTime = when;
+                latestRemark = (m['remarks'] ?? m['remark'])?.toString().trim();
+                if (latestRemark?.isEmpty ?? true) {
+                  latestRemark = null;
+                }
                 break;
               }
             }
@@ -608,6 +629,10 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
                 if (guardId == null || guardId.isEmpty || scanGuard == null || scanGuard.isEmpty || scanGuard == guardId) {
                   isScanned = true;
                   scannedAtTime = when;
+                  latestRemark = (m['remarks'] ?? m['remark'])?.toString().trim();
+                  if (latestRemark?.isEmpty ?? true) {
+                    latestRemark = null;
+                  }
                   break;
                 }
               }
@@ -619,7 +644,8 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
           'name': name,
           'location': location,
           'status': isScanned ? 'Scanned' : 'Not Yet Scanned',
-          'id': docId, // Use the captured document ID
+          'id': docId,
+          'remarks': latestRemark ?? '',
           'scannedAt': scannedAtTime?.toIso8601String(),
         });
       } catch (e) {
@@ -628,6 +654,7 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
           'location': 'Error',
           'status': 'Error',
           'id': checkpointId.toString(),
+          'remarks': '',
         });
       }
     }
@@ -986,6 +1013,8 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
                                           final isInspected = rawStatus == 'scanned' || rawStatus == 'inspected';
                                           final label = isInspected ? 'Inspected' : 'Not Yet Inspected';
                                           final location = (cp['location'] as String? ?? cp['name'] as String? ?? cp['id'] as String? ?? 'Unknown');
+                                          final remarks = (cp['remarks'] as String? ?? '').trim();
+                                          final remarksText = remarks.isNotEmpty ? ' • Remarks: $remarks' : '';
                                           return Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
@@ -997,7 +1026,7 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
                                               ),
                             ),
                             child: Text(
-                                              '$location ($label)',
+                                              '$location ($label)$remarksText',
                               style: TextStyle(
                                                 color: isInspected ? Colors.green.shade800 : Colors.orange.shade800,
                                                 fontWeight: FontWeight.bold,
