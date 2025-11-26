@@ -1,14 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:pdf/pdf.dart' as pdf_core;
-import 'package:printing/printing.dart';
-import 'package:flutter/services.dart' show rootBundle;
 import '../models/checkpoint_model.dart';
 import 'package:thesis_web/widgets/app_nav.dart';
-import 'package:thesis_web/services/report_signatory_service.dart';
 import 'package:thesis_web/utils/guard_name_utils.dart';
+
+String _formatCheckpointStatus(CheckpointScanStatus status) {
+  final raw = checkpointScanStatusToString(status);
+  switch (raw.toLowerCase()) {
+    case 'scanned':
+      return 'Inspected';
+    case 'not yet scanned':
+      return 'Not Yet Inspected';
+    default:
+      return raw;
+  }
+}
 
 class SecurityGuardOverviewScreen extends StatefulWidget {
   final Map<String, dynamic> guardData;
@@ -32,170 +39,6 @@ class _SecurityGuardOverviewScreenState
   bool _isLoadingSchedule = true;
   List<String> assignedCheckpointNames = [];
   List<CheckpointModel> assignedCheckpoints = [];
-  bool _isPrinting = false;
-  pw.MemoryImage? _headerImage;
-  pw.MemoryImage? _footerImage;
-  ReportSignatory? _signatory;
-
-  Future<void> _loadSignatory() async {
-    try {
-      final signatory = await ReportSignatoryService.fetch();
-      if (mounted) {
-        setState(() {
-          _signatory = signatory;
-        });
-      }
-    } catch (_) {
-      // use defaults
-    }
-  }
-
-  String get _preparedByName => (_signatory?.preparedByName ?? ReportSignatory.defaults.preparedByName);
-  String get _preparedByTitle => (_signatory?.preparedByTitle ?? ReportSignatory.defaults.preparedByTitle);
-
-  Future<void> _loadReportAssets() async {
-    try {
-      final headerBytes = await rootBundle.load('assets/images/SecurityHeader.png');
-      _headerImage = pw.MemoryImage(headerBytes.buffer.asUint8List());
-    } catch (_) {}
-
-    try {
-      final footerBytes = await rootBundle.load('assets/images/SecurityFooter.png');
-      _footerImage = pw.MemoryImage(footerBytes.buffer.asUint8List());
-    } catch (_) {}
-  }
-
-  Future<void> _printScheduledCheckpointsReport() async {
-    if (assignedCheckpoints.isEmpty) return;
-    setState(() { _isPrinting = true; });
-    try {
-      // 1. Load assets if needed (assumes _loadReportAssets is available)
-      if (_headerImage == null || _footerImage == null) {
-        await _loadReportAssets();
-      }
-      final pdf = pw.Document();
-      final dateStr = DateFormat.yMMMMd().format(DateTime.now());
-      final guard = widget.guardData;
-      final guardName = GuardNameUtils.format(
-        firstName: guard['first_name'] as String?,
-        lastName: guard['last_name'] as String?,
-        fallbackName: guard['name'] as String?,
-      );
-
-      // 🎯 DEFINITION FOR 8x13 INCH (LONG BOND) PAGE FORMAT
-      // This uses the correct 'pdf_core.' prefix for PdfPageFormat and PdfPageFormat.inch
-      const double longBondWidth = 8.0 * pdf_core.PdfPageFormat.inch;
-      const double longBondHeight = 13.0 * pdf_core.PdfPageFormat.inch;
-      final pdf_core.PdfPageFormat longBondPageFormat = pdf_core.PdfPageFormat(longBondWidth, longBondHeight);
-
-
-      pdf.addPage(
-        pw.MultiPage(
-          // ✅ USING THE LOCALLY DEFINED VARIABLE 'longBondPageFormat'
-          pageFormat: longBondPageFormat,
-          margin: const pw.EdgeInsets.only(left: 30, right: 30, top: 20, bottom: 10),
-
-          // 1. HEADER: Image on every page
-          header: (context) => _headerImage != null
-              ? pw.Center(
-            child: pw.Image(
-              _headerImage!,
-              fit: pw.BoxFit.fitWidth,
-              height: 80,
-            ),
-          )
-              : pw.SizedBox.shrink(),
-
-          // 2. FOOTER: Signature (Last Page Only) and Image (Every Page)
-          footer: (context) {
-            final isLastPage = context.pageNumber == context.pagesCount;
-
-            return pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.center,
-              children: [
-                // Signature Block (Only on Last Page and at the top of the footer area)
-                if (isLastPage)
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.only(top: 8, bottom: 12),
-                    child: pw.Row(
-                      mainAxisAlignment: pw.MainAxisAlignment.center,
-                      children: [
-                        pw.Column(
-                          children: [
-                            pw.Text('Prepared by:', style: const pw.TextStyle(fontSize: 11)),
-                            pw.SizedBox(height: 16),
-                            pw.Text(
-                              _preparedByName,
-                              style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
-                            ),
-                            pw.Text(_preparedByTitle, style: const pw.TextStyle(fontSize: 11)),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                // Footer Image (Every Page)
-                if (_footerImage != null)
-                  pw.Center(
-                    child: pw.Image(
-                      _footerImage!,
-                      fit: pw.BoxFit.fitWidth,
-                      height: 50,
-                    ),
-                  )
-                else
-                  pw.SizedBox.shrink(),
-              ],
-            );
-          },
-
-          // 3. BUILD: Main content only (no signature or redundant footer image)
-          build: (pw.Context context) {
-            return [
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('Scheduled Checkpoints Report', style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
-                  pw.Text(dateStr, style: const pw.TextStyle(fontSize: 12)),
-                ],
-              ),
-              pw.SizedBox(height: 8),
-              pw.Text('Security Guard: ${guardName.isEmpty ? 'N/A' : guardName}', style: const pw.TextStyle(fontSize: 12)),
-              pw.Text('Guard ID: ${guard['guard_id'] ?? 'N/A'}', style: const pw.TextStyle(fontSize: 12)),
-              pw.SizedBox(height: 16),
-              // NOTE: Changing to TableHelper to address deprecation warning
-              pw.TableHelper.fromTextArray(
-                headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                headers: ['Checkpoint', 'Location', 'Status'],
-                data: assignedCheckpoints.map((cp) => [
-                  cp.name,
-                  cp.location,
-                  checkpointScanStatusToString(cp.status),
-                ]).toList(),
-                cellAlignment: pw.Alignment.centerLeft,
-                headerDecoration: const pw.BoxDecoration(color: pdf_core.PdfColors.grey300),
-                cellStyle: const pw.TextStyle(fontSize: 11),
-              ),
-              pw.SizedBox(height: 32),
-            ];
-          },
-        ),
-      );
-
-      await Printing.layoutPdf(
-        onLayout: (pdf_core.PdfPageFormat format) async => pdf.save(),
-        name: 'Scheduled_Checkpoints_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.pdf',
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to print report: $e'), backgroundColor: Theme.of(context).colorScheme.error),
-      );
-    } finally {
-      if (mounted) setState(() { _isPrinting = false; });
-    }
-  }
 
   @override
   void initState() {
@@ -222,9 +65,7 @@ class _SecurityGuardOverviewScreenState
     } else {
       print("Overview initState: Guard ID seems present. Calling _loadScheduleStatus.");
       _loadScheduleStatus();
-      _loadReportAssets();
     }
-    _loadSignatory();
   }
 
   Future<void> _loadScheduleStatus() async {
@@ -534,105 +375,6 @@ class _SecurityGuardOverviewScreenState
                   ...assignedCheckpoints.map((checkpoint) => CheckpointCard(checkpoint: checkpoint)),
                 ],
               ),
-              const SizedBox(height: 16),
-              InfoCard(
-                title: 'Scheduled Checkpoints (Table)',
-                children: [
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: DataTableTheme(
-                      data: DataTableThemeData(
-                        headingRowColor: MaterialStateProperty.all(Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.6)),
-                        headingTextStyle: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.onSurface,
-                            ) ?? const TextStyle(fontWeight: FontWeight.bold),
-                        dataRowColor: MaterialStateProperty.resolveWith<Color?>((states) => null),
-                        dividerThickness: 0.6,
-                      ),
-                      child: DataTable(
-                        headingRowHeight: 42,
-                        columnSpacing: 28,
-                        dataRowMinHeight: 52,
-                        dataRowMaxHeight: 64,
-                        columns: const [
-                          DataColumn(label: Text('Checkpoint')),
-                          DataColumn(label: Text('Area')),
-                          DataColumn(label: Text('Status')),
-                        ],
-                        rows: [
-                          for (int i = 0; i < assignedCheckpoints.length; i++)
-                            (() {
-                              final cp = assignedCheckpoints[i];
-                              final isScanned = cp.status == CheckpointScanStatus.scanned;
-                              final rowBg = i % 2 == 0 ? Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.2) : Colors.transparent;
-                              return DataRow(
-                                color: MaterialStateProperty.all(rowBg),
-                                cells: [
-                                  DataCell(SizedBox(
-                                    width: 260,
-                                    child: Text(
-                                      cp.name,
-                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  )),
-                                  DataCell(SizedBox(
-                                    width: 220,
-                                    child: Text(
-                                      cp.location,
-                                      style: Theme.of(context).textTheme.bodyMedium,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  )),
-                                  DataCell(Row(
-                                    children: [
-                                      Chip(
-                                        visualDensity: VisualDensity.compact,
-                                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                                        backgroundColor: isScanned ? Colors.green.withOpacity(0.12) : Colors.red.withOpacity(0.12),
-                                        label: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Container(
-                                              width: 8,
-                                              height: 8,
-                                              decoration: BoxDecoration(
-                                                color: isScanned ? Colors.green : Colors.red,
-                                                shape: BoxShape.circle,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Text(
-                                              checkpointScanStatusToString(cp.status),
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.w600,
-                                                color: isScanned ? Colors.green.shade800 : Colors.red.shade800,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  )),
-                                ],
-                              );
-                            })(),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: ElevatedButton.icon(
-                      onPressed: _isPrinting ? null : _printScheduledCheckpointsReport,
-                      icon: const Icon(Icons.print),
-                      label: Text(_isPrinting ? 'Printing…' : 'Print Report'),
-                    ),
-                  ),
-                ],
-              ),
             ],
           ],
         ),
@@ -801,7 +543,7 @@ class CheckpointCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  checkpointScanStatusToString(checkpoint.status),
+                  _formatCheckpointStatus(checkpoint.status),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
@@ -836,6 +578,24 @@ class CheckpointCard extends StatelessWidget {
                   style: theme.textTheme.bodySmall,
                 ),
               ],
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.comment,
+                size: 16,
+                color: theme.textTheme.bodySmall?.color,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  'Remarks: ${checkpoint.remarks?.trim().isNotEmpty == true ? checkpoint.remarks!.trim() : 'No remarks yet'}',
+                  style: theme.textTheme.bodySmall,
+                ),
+              ),
             ],
           ),
           if (checkpoint.notes != null && checkpoint.notes!.isNotEmpty) ...[

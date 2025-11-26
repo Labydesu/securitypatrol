@@ -189,27 +189,6 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
     });
   }
 
-  Future<void> _printSchedule() async {
-    if (_selectedGuardId == null || _selectedGuardName == null) return;
-
-    try {
-      final scheduleData = await _getScheduleDataForPrint();
-      if (!mounted) return;
-
-      if (scheduleData.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No schedule data to print')));
-        return;
-      }
-      final reportText = _generateTextReport(scheduleData);
-      _showReportDialog(reportText);
-
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error generating report: $e')));
-      }
-    }
-  }
-
   Future<List<Map<String, dynamic>>> _getScheduleDataForPrint() async {
     if (_selectedGuardId == null) return [];
 
@@ -249,58 +228,6 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
     return allSchedules;
   }
 
-  String _generateTextReport(List<Map<String, dynamic>> scheduleData) {
-    final buffer = StringBuffer();
-    buffer.writeln('SCHEDULE CHECKPOINT SUMMARY REPORT');
-    buffer.writeln('=' * 45);
-    buffer.writeln('Guard: ${_selectedGuardName ?? 'Unknown'}');
-    buffer.writeln('Period: ${_periodType == 'Monthly' ? DateFormat('MMMM yyyy').format(_anchorDate) : 'Weekly'}');
-    buffer.writeln('Schedule Type: $_scheduleType');
-    buffer.writeln('Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}');
-    buffer.writeln('');
-    buffer.writeln('Date\t\tCheckpoints');
-    buffer.writeln('-' * 50);
-
-    for (final schedule in scheduleData) {
-      final checkpoints = schedule['checkpoints'] as List<Map<String, dynamic>>? ?? [];
-      final checkpointText = checkpoints.map((cp) {
-        final remarks = (cp['remarks'] as String? ?? '').trim();
-        final remarksText = remarks.isNotEmpty ? ' | Remarks: $remarks' : '';
-        return '${cp['id']} (${cp['status']})$remarksText';
-      }).join(', ');
-      buffer.writeln('${schedule['date']}\t\t$checkpointText');
-    }
-
-    buffer.writeln('');
-    buffer.writeln('Total Schedules: ${scheduleData.length}');
-    return buffer.toString();
-  }
-
-  void _showReportDialog(String reportText) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Checkpoint Summary Report'),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 400,
-          child: SingleChildScrollView(
-            child: Text(
-              reportText,
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _printPDF() async {
     if (_selectedGuardId == null || _selectedGuardName == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a guard first')));
@@ -336,26 +263,36 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
       return;
     }
     final buffer = StringBuffer();
-    buffer.writeln('Date,Start Time,End Time,Checkpoints');
+    buffer.writeln('Date,Start Time,End Time,Checkpoints,Remarks');
     for (final schedule in data) {
-      final checkpoints = (schedule['checkpoints'] as List<Map<String, dynamic>>? ?? [])
+      final checkpointsList = (schedule['checkpoints'] as List<Map<String, dynamic>>? ?? []);
+      final checkpoints = checkpointsList
           .map((cp) {
             final rawStatus = (cp['status'] as String? ?? '').toLowerCase();
             final statusLabel = rawStatus == 'scanned' || rawStatus == 'inspected'
                 ? 'Inspected'
                 : 'Not Yet Inspected';
-            final location = (cp['location'] as String? ?? cp['name'] as String? ?? cp['id'] as String? ?? 'Unknown');
-            final remarks = (cp['remarks'] as String? ?? '').trim();
-            final remarksText = remarks.isNotEmpty ? ' | Remarks: $remarks' : '';
-            return '$location ($statusLabel)$remarksText';
+            final checkpointName = (cp['name'] as String? ?? cp['location'] as String? ?? cp['id'] as String? ?? 'Unknown');
+            return '$checkpointName ($statusLabel)';
           })
           .join('; ');
+
+      final remarks = checkpointsList
+          .map((cp) {
+            final checkpointName = (cp['name'] as String? ?? cp['location'] as String? ?? cp['id'] as String? ?? 'Unknown');
+            final rawRemark = (cp['remarks'] as String? ?? '').trim();
+            final remarkText = rawRemark.isNotEmpty ? rawRemark : 'Checkpoint not Inspected';
+            return '$checkpointName (Remarks: $remarkText)';
+          })
+          .join('; ');
+
       String esc(String v) => '"${v.replaceAll('"', '""')}"';
       buffer.writeln([
         esc(schedule['date'] as String? ?? ''),
         esc(schedule['start_time'] as String? ?? ''),
         esc(schedule['end_time'] as String? ?? ''),
         esc(checkpoints),
+        esc(remarks),
       ].join(','));
     }
     final bytes = Uint8List.fromList(buffer.toString().codeUnits);
@@ -498,14 +435,22 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
                 headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                 headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),
                 cellHeight: 30,
-                cellAlignments: {0: pw.Alignment.centerLeft, 1: pw.Alignment.topLeft},
-                columnWidths: {0: const pw.FixedColumnWidth(100), 1: const pw.FlexColumnWidth()},
-                headers: ['Date', 'Checkpoints'],
+                cellAlignments: {
+                  0: pw.Alignment.centerLeft,
+                  1: pw.Alignment.topLeft,
+                  2: pw.Alignment.topLeft,
+                },
+                columnWidths: {
+                  0: const pw.FixedColumnWidth(80),
+                  1: const pw.FlexColumnWidth(),
+                  2: const pw.FlexColumnWidth(),
+                },
+                headers: ['Date', 'Checkpoints', 'Remarks'],
                 data: sortedScheduleData.map((schedule) {
                   final checkpoints = schedule['checkpoints'] as List<Map<String, dynamic>>? ?? [];
                   final checkpointText = checkpoints.map((cp) {
                     final rawStatus = (cp['status'] as String? ?? '').toLowerCase();
-                    final location = (cp['location'] as String? ?? cp['name'] as String? ?? cp['id'] as String? ?? 'Unknown');
+                    final checkpointName = (cp['name'] as String? ?? cp['location'] as String? ?? cp['id'] as String? ?? 'Unknown');
                     final scannedAtIso = cp['scannedAt'] as String?;
                     DateTime? scannedAt;
                     if (scannedAtIso != null && scannedAtIso.isNotEmpty) {
@@ -517,11 +462,17 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
                     final statusLabel = rawStatus == 'scanned'
                         ? 'Inspected$timeLabel'
                         : 'Not Yet Inspected';
-                    final remarks = (cp['remarks'] as String? ?? '').trim();
-                    final remarksText = remarks.isNotEmpty ? ' • Remarks: $remarks' : '';
-                    return '$location ($statusLabel)$remarksText';
-                  }).join(',\n');
-                  return [schedule['date'] as String, checkpointText];
+                    return '$checkpointName ($statusLabel)';
+                  }).join('\n');
+
+                  final remarksText = checkpoints.map((cp) {
+                    final checkpointName = (cp['name'] as String? ?? cp['location'] as String? ?? cp['id'] as String? ?? 'Unknown');
+                    final rawRemarks = (cp['remarks'] as String? ?? '').trim();
+                    final remarks = rawRemarks.isNotEmpty ? rawRemarks : 'Checkpoint not Inspected';
+                    return '$checkpointName (Remarks: $remarks)';
+                  }).join('\n');
+
+                  return [schedule['date'] as String, checkpointText, remarksText];
                 }).toList(),
               ),
               pw.SizedBox(height: 20),
@@ -833,35 +784,6 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
                       children: [
                         Container(
                           decoration: BoxDecoration(
-                            color: Colors.blue,
-                            borderRadius: BorderRadius.circular(8),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.grey.withOpacity(0.2),
-                                spreadRadius: 1,
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: ElevatedButton.icon(
-                          icon: const Icon(Icons.text_snippet),
-                          label: const Text('Text'),
-                          onPressed: _printSchedule,
-                          style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
-                              elevation: 0,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          decoration: BoxDecoration(
                             color: Colors.green,
                             borderRadius: BorderRadius.circular(8),
                             boxShadow: [
@@ -994,6 +916,18 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
                                   ),
                                 ),
                               ),
+                              Expanded(
+                                flex: 3,
+                                child: Text(
+                                  'REMARKS',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                  textAlign: TextAlign.right,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -1014,6 +948,7 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
                                   color: isEven ? Colors.white : Colors.grey.shade50,
                                 ),
                                 child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Expanded(
                                       flex: 2,
@@ -1025,34 +960,67 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
                                     Expanded(
                                       flex: 3,
                                       child: Wrap(
-                          spacing: 4,
-                          runSpacing: 4,
-                          children: (schedule['checkpoints'] as List<Map<String, dynamic>>? ?? [])
+                                        spacing: 4,
+                                        runSpacing: 4,
+                                        children: (schedule['checkpoints'] as List<Map<String, dynamic>>? ?? [])
                                             .map((cp) {
                                           final rawStatus = (cp['status'] as String? ?? '').toLowerCase();
                                           final isInspected = rawStatus == 'scanned' || rawStatus == 'inspected';
                                           final label = isInspected ? 'Inspected' : 'Not Yet Inspected';
-                                          final location = (cp['location'] as String? ?? cp['name'] as String? ?? cp['id'] as String? ?? 'Unknown');
-                                          final remarks = (cp['remarks'] as String? ?? '').trim();
-                                          final remarksText = remarks.isNotEmpty ? ' • Remarks: $remarks' : '';
+                                          final checkpointName = (cp['name'] as String? ?? cp['location'] as String? ?? cp['id'] as String? ?? 'Unknown');
                                           return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
                                               color: isInspected ? Colors.green.shade100 : Colors.orange.shade100,
-                              borderRadius: BorderRadius.circular(12),
+                                              borderRadius: BorderRadius.circular(12),
                                               border: Border.all(
                                                 color: isInspected ? Colors.green.shade300 : Colors.orange.shade300,
                                                 width: 1,
                                               ),
-                            ),
-                            child: Text(
-                                              '$location ($label)$remarksText',
-                              style: TextStyle(
+                                            ),
+                                            child: Text(
+                                              '$checkpointName ($label)',
+                                              style: TextStyle(
                                                 color: isInspected ? Colors.green.shade800 : Colors.orange.shade800,
                                                 fontWeight: FontWeight.bold,
-                                fontSize: 11,
-                              ),
-                            ),
+                                                fontSize: 11,
+                                              ),
+                                            ),
+                                          );
+                                        }).toList(),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      flex: 3,
+                                      child: Wrap(
+                                        spacing: 4,
+                                        runSpacing: 4,
+                                        children: (schedule['checkpoints'] as List<Map<String, dynamic>>? ?? [])
+                                            .map((cp) {
+                                          final checkpointName = (cp['name'] as String? ?? cp['location'] as String? ?? cp['id'] as String? ?? 'Unknown');
+                                          final rawStatus = (cp['status'] as String? ?? '').toLowerCase();
+                                          final isInspected = rawStatus == 'scanned' || rawStatus == 'inspected';
+                                          final rawRemarks = (cp['remarks'] as String? ?? '').trim();
+                                          final remarks = rawRemarks.isNotEmpty ? rawRemarks : 'Checkpoint not Inspected';
+                                          final text = '$checkpointName (Remarks: $remarks)';
+                                          return Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: isInspected ? Colors.green.shade100 : Colors.orange.shade100,
+                                              borderRadius: BorderRadius.circular(12),
+                                              border: Border.all(
+                                                color: isInspected ? Colors.green.shade300 : Colors.orange.shade300,
+                                                width: 1,
+                                              ),
+                                            ),
+                                            child: Text(
+                                              text,
+                                              style: TextStyle(
+                                                color: isInspected ? Colors.green.shade800 : Colors.orange.shade800,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 11,
+                                              ),
+                                            ),
                                           );
                                         }).toList(),
                                       ),
