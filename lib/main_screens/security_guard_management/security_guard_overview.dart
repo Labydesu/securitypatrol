@@ -7,12 +7,8 @@ import 'package:printing/printing.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import '../models/checkpoint_model.dart';
 import 'package:thesis_web/widgets/app_nav.dart';
+import 'package:thesis_web/services/report_signatory_service.dart';
 import 'package:thesis_web/utils/guard_name_utils.dart';
-
-const pdf_core.PdfPageFormat _longBondPageFormat = pdf_core.PdfPageFormat(
-  8.5 * pdf_core.PdfPageFormat.inch,
-  13 * pdf_core.PdfPageFormat.inch,
-);
 
 class SecurityGuardOverviewScreen extends StatefulWidget {
   final Map<String, dynamic> guardData;
@@ -39,6 +35,23 @@ class _SecurityGuardOverviewScreenState
   bool _isPrinting = false;
   pw.MemoryImage? _headerImage;
   pw.MemoryImage? _footerImage;
+  ReportSignatory? _signatory;
+
+  Future<void> _loadSignatory() async {
+    try {
+      final signatory = await ReportSignatoryService.fetch();
+      if (mounted) {
+        setState(() {
+          _signatory = signatory;
+        });
+      }
+    } catch (_) {
+      // use defaults
+    }
+  }
+
+  String get _preparedByName => (_signatory?.preparedByName ?? ReportSignatory.defaults.preparedByName);
+  String get _preparedByTitle => (_signatory?.preparedByTitle ?? ReportSignatory.defaults.preparedByTitle);
 
   Future<void> _loadReportAssets() async {
     try {
@@ -112,10 +125,10 @@ class _SecurityGuardOverviewScreenState
                             pw.Text('Prepared by:', style: const pw.TextStyle(fontSize: 11)),
                             pw.SizedBox(height: 16),
                             pw.Text(
-                              'PRINCE JUN N. DAMASCO',
+                              _preparedByName,
                               style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
                             ),
-                            pw.Text('Head, Security Services', style: const pw.TextStyle(fontSize: 11)),
+                            pw.Text(_preparedByTitle, style: const pw.TextStyle(fontSize: 11)),
                           ],
                         ),
                       ],
@@ -211,6 +224,7 @@ class _SecurityGuardOverviewScreenState
       _loadScheduleStatus();
       _loadReportAssets();
     }
+    _loadSignatory();
   }
 
   Future<void> _loadScheduleStatus() async {

@@ -15,6 +15,7 @@ import 'package:thesis_web/main_screens/mapping/mapping_management.dart';
 import 'package:thesis_web/main_screens/checkpoint_management/checkpoint_list.dart';
 import 'package:thesis_web/main_screens/logs/transaction_logs.dart';
 import 'package:thesis_web/main_screens/settings/manage_users.dart';
+import 'package:thesis_web/main_screens/settings/report_signatory_settings.dart';
 import 'package:thesis_web/main_screens/settings/restore_and_backup.dart';
 import 'package:thesis_web/main_screens/dashboard/dashboard_screen.dart';
 
@@ -133,6 +134,7 @@ Widget appNavList(BuildContext context, {required bool closeDrawer}) {
           _navSubItem(context, 'Manage Users', () => const ManageUsersPage(), icon: Icons.manage_accounts_outlined, closeDrawer: closeDrawer),
           _navSubItem(context, 'Backup and Restore', () => const BackupRestorePage(), icon: Icons.backup_outlined, closeDrawer: closeDrawer),
           _navSubItem(context, 'Transaction Logs', () => const TransactionLogsPage(), icon: Icons.list_alt_outlined, closeDrawer: closeDrawer),
+          _navSubItem(context, 'Report Signatory', () => const ReportSignatorySettingsScreen(), icon: Icons.assignment_ind_outlined, closeDrawer: closeDrawer),
         ],
       ),
       const Divider(),

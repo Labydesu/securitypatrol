@@ -13,11 +13,7 @@ import 'package:thesis_web/utils/download_saver.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-
-const PdfPageFormat _longBondPageFormat = PdfPageFormat(
-  8.5 * PdfPageFormat.inch,
-  13 * PdfPageFormat.inch,
-);
+import 'package:thesis_web/services/report_signatory_service.dart';
 
 class CheckpointListReportScreen extends StatefulWidget {
   const CheckpointListReportScreen({super.key});
@@ -32,12 +28,30 @@ class _CheckpointListReportScreenState extends State<CheckpointListReportScreen>
   String? _error;
   List<Map<String, dynamic>> _checkpoints = [];
   String _search = '';
+  ReportSignatory? _signatory;
 
   @override
   void initState() {
     super.initState();
     _fetch();
+    _loadSignatory();
   }
+
+  Future<void> _loadSignatory() async {
+    try {
+      final signatory = await ReportSignatoryService.fetch();
+      if (mounted) {
+        setState(() {
+          _signatory = signatory;
+        });
+      }
+    } catch (_) {
+      // ignore errors
+    }
+  }
+
+  String get _preparedByName => (_signatory?.preparedByName ?? ReportSignatory.defaults.preparedByName);
+  String get _preparedByTitle => (_signatory?.preparedByTitle ?? ReportSignatory.defaults.preparedByTitle);
 
   Future<void> _fetch() async {
     setState(() {
@@ -163,10 +177,10 @@ class _CheckpointListReportScreenState extends State<CheckpointListReportScreen>
                           pw.Text('Prepared by:', style: const pw.TextStyle(fontSize: 11)),
                           pw.SizedBox(height: 16),
                           pw.Text(
-                            'PRINCE JUN N. DAMASCO',
+                            _preparedByName,
                             style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
                           ),
-                          pw.Text('Head, Security Services', style: const pw.TextStyle(fontSize: 11)),
+                          pw.Text(_preparedByTitle, style: const pw.TextStyle(fontSize: 11)),
                         ],
                       ),
                     ],

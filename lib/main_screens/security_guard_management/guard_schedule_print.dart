@@ -9,13 +9,9 @@ import 'package:printing/printing.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:thesis_web/utils/download_saver.dart';
+import 'package:thesis_web/services/report_signatory_service.dart';
 import 'package:thesis_web/utils/guard_name_utils.dart';
 import 'dart:typed_data';
-
-const PdfPageFormat _longBondPageFormat = PdfPageFormat(
-  8.5 * PdfPageFormat.inch,
-  13 * PdfPageFormat.inch,
-);
 
 class GuardSchedulePrintScreen extends StatefulWidget {
   const GuardSchedulePrintScreen({super.key});
@@ -36,46 +32,33 @@ class _GuardSchedulePrintScreenState extends State<GuardSchedulePrintScreen> {
   List<Map<String, String>> _guards = const [];
   bool _isLoadingGuards = false;
   String? _guardsError;
+  ReportSignatory? _signatory;
 
   // Font and asset data for PDF generation
-  pw.Font? _robotoRegular;
-  pw.Font? _robotoBold;
-  pw.Font? _robotoItalic;
-  pw.MemoryImage? _headerImage;
-  pw.MemoryImage? _footerImage;
 
   @override
   void initState() {
     super.initState();
     _fetchGuards();
-    _loadAssets();
+    _loadSignatory();
   }
 
-  Future<void> _loadAssets() async {
+  Future<void> _loadSignatory() async {
     try {
-      // Load Roboto fonts for PDF generation
-      _robotoRegular = await PdfGoogleFonts.robotoRegular();
-      _robotoBold = await PdfGoogleFonts.robotoBold();
-      _robotoItalic = await PdfGoogleFonts.robotoItalic();
-
-      try {
-        final headerBytes = await rootBundle.load('assets/images/SecurityHeader.png');
-        _headerImage = pw.MemoryImage(headerBytes.buffer.asUint8List());
-      } catch (e) {
-        print('Error loading header image: $e');
+      final signatory = await ReportSignatoryService.fetch();
+      if (mounted) {
+        setState(() {
+          _signatory = signatory;
+        });
       }
-
-      try {
-        final footerBytes = await rootBundle.load('assets/images/SecurityFooter.png');
-        _footerImage = pw.MemoryImage(footerBytes.buffer.asUint8List());
-      } catch (e) {
-        print('Error loading footer image: $e');
-      }
-    } catch (e) {
-      print('Error loading fonts: $e');
-      // Fallback to default fonts if custom fonts fail to load
+    } catch (_) {
+      // ignore
     }
   }
+
+  String get _preparedByName => (_signatory?.preparedByName ?? ReportSignatory.defaults.preparedByName);
+  String get _preparedByTitle => (_signatory?.preparedByTitle ?? ReportSignatory.defaults.preparedByTitle);
+
 
   Future<void> _fetchGuards() async {
     setState(() {
@@ -461,13 +444,13 @@ class _GuardSchedulePrintScreenState extends State<GuardSchedulePrintScreen> {
                 children: [
                   pw.Column(
                     children: [
-                      pw.Text('Prepared by:', style: const pw.TextStyle(fontSize: 11)),
-                      pw.SizedBox(height: 16),
-                      pw.Text(
-                        'PRINCE JUN N. DAMASCO',
-                        style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
-                      ),
-                      pw.Text('Head, Security Services', style: const pw.TextStyle(fontSize: 11)),
+                          pw.Text('Prepared by:', style: const pw.TextStyle(fontSize: 11)),
+                          pw.SizedBox(height: 16),
+                          pw.Text(
+                            _preparedByName,
+                            style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+                          ),
+                          pw.Text(_preparedByTitle, style: const pw.TextStyle(fontSize: 11)),
                     ],
                   ),
                 ],

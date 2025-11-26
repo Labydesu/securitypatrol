@@ -21,6 +21,7 @@ import 'package:thesis_web/main_screens/security_guard_management/guard_schedule
 import 'package:thesis_web/main_screens/reports/guard_list_report.dart';
 import 'package:thesis_web/main_screens/reports/checkpoint_list_report.dart';
 import 'package:thesis_web/main_screens/reports/schedule_checkpoint_summary_report.dart';
+import 'package:thesis_web/main_screens/settings/report_signatory_settings.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:ui' as ui;
 import 'package:thesis_web/services/guard_status_service.dart';
@@ -1499,6 +1500,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _buildDrawerSubItem(context, 'Manage Users', () => const ManageUsersPage(), icon: Icons.manage_accounts_outlined, closeDrawer: closeDrawer),
             _buildDrawerSubItem(context, 'Backup and Restore', () => const BackupRestorePage(), icon: Icons.backup_outlined, closeDrawer: closeDrawer),
             _buildDrawerSubItem(context, 'Transaction Logs', () => const TransactionLogsPage(), icon: Icons.list_alt_outlined, closeDrawer: closeDrawer),
+            _buildDrawerSubItem(context, 'Report Signatory', () => const ReportSignatorySettingsScreen(), icon: Icons.assignment_ind_outlined, closeDrawer: closeDrawer),
           ],
         ),
         const Divider(),

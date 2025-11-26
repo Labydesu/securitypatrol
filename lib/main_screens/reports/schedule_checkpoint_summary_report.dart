@@ -11,6 +11,7 @@ import 'package:thesis_web/utils/download_saver.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:thesis_web/services/report_signatory_service.dart';
 import 'package:thesis_web/utils/guard_name_utils.dart';
 
 class ScheduleCheckpointSummaryReportScreen extends StatefulWidget {
@@ -31,12 +32,30 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
   String _scheduleType = 'All Schedules';
 
   List<Map<String, String>> _guards = const [];
+  ReportSignatory? _signatory;
 
   @override
   void initState() {
     super.initState();
     _fetchGuards();
+    _loadSignatory();
   }
+
+  Future<void> _loadSignatory() async {
+    try {
+      final signatory = await ReportSignatoryService.fetch();
+      if (mounted) {
+        setState(() {
+          _signatory = signatory;
+        });
+      }
+    } catch (_) {
+      // ignore, fallback to defaults
+    }
+  }
+
+  String get _preparedByName => (_signatory?.preparedByName ?? ReportSignatory.defaults.preparedByName);
+  String get _preparedByTitle => (_signatory?.preparedByTitle ?? ReportSignatory.defaults.preparedByTitle);
 
   Future<void> _fetchGuards() async {
     try {
@@ -447,9 +466,10 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
                             pw.Text('Prepared by:', style: const pw.TextStyle(fontSize: 11)),
                             pw.SizedBox(height: 16),
                             pw.Text(
-                              'PRINCE JUN N. DAMASCO',
-                              style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),),
-                            pw.Text('Head, Security Services', style: const pw.TextStyle(fontSize: 11)),
+                              _preparedByName,
+                              style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+                            ),
+                            pw.Text(_preparedByTitle, style: const pw.TextStyle(fontSize: 11)),
                           ],
                         ),
                       ],
