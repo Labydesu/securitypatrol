@@ -925,7 +925,6 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
                                     fontWeight: FontWeight.bold,
                                     fontSize: 14,
                                   ),
-                                  textAlign: TextAlign.right,
                                 ),
                               ),
                             ],

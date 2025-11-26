@@ -212,7 +212,7 @@ class _CheckpointListReportScreenState extends State<CheckpointListReportScreen>
           pw.Text('Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}', style: const pw.TextStyle(fontSize: 10)),
           pw.SizedBox(height: 16),
           pw.Table(
-            border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.8),
+            border: pw.TableBorder.all(),
             columnWidths: {
               0: const pw.FixedColumnWidth(40),
               1: const pw.FlexColumnWidth(2),
