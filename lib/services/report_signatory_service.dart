@@ -3,15 +3,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class ReportSignatory {
   final String preparedByName;
   final String preparedByTitle;
+  final String since;
 
   const ReportSignatory({
     required this.preparedByName,
     required this.preparedByTitle,
+    required this.since,
   });
 
   static const ReportSignatory defaults = ReportSignatory(
     preparedByName: 'PRINCE JUN N. DAMASCO',
     preparedByTitle: 'Head, Security Services',
+    since: '2014',
   );
 
   factory ReportSignatory.fromMap(Map<String, dynamic>? data) {
@@ -20,15 +23,18 @@ class ReportSignatory {
     }
     final name = (data['preparedByName'] as String?)?.trim();
     final title = (data['preparedByTitle'] as String?)?.trim();
+    final since = (data['since'] as String?)?.trim();
     return ReportSignatory(
       preparedByName: (name == null || name.isEmpty) ? defaults.preparedByName : name,
       preparedByTitle: (title == null || title.isEmpty) ? defaults.preparedByTitle : title,
+      since: (since == null || since.isEmpty) ? defaults.since : since,
     );
   }
 
   Map<String, dynamic> toMap() => {
         'preparedByName': preparedByName,
         'preparedByTitle': preparedByTitle,
+        'since': since,
       };
 }
 

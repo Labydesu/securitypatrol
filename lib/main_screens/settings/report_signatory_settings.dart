@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:thesis_web/services/report_signatory_service.dart';
 import 'package:thesis_web/widgets/app_nav.dart';
 
@@ -14,6 +13,7 @@ class ReportSignatorySettingsScreen extends StatefulWidget {
 class _ReportSignatorySettingsScreenState extends State<ReportSignatorySettingsScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _sinceController = TextEditingController();
 
   bool _isLoading = true;
   bool _isSaving = false;
@@ -39,6 +39,7 @@ class _ReportSignatorySettingsScreenState extends State<ReportSignatorySettingsS
       _currentSignatory = signatory;
       _nameController.text = signatory.preparedByName;
       _titleController.text = signatory.preparedByTitle;
+      _sinceController.text = signatory.since;
     } catch (e) {
       if (mounted) {
         _error = 'Failed to load signatory info: $e';
@@ -55,8 +56,14 @@ class _ReportSignatorySettingsScreenState extends State<ReportSignatorySettingsS
   Future<void> _save() async {
     final name = _nameController.text.trim();
     final title = _titleController.text.trim();
-    if (name.isEmpty || title.isEmpty) {
-      _showSnack('Both name and title are required.', isError: true);
+    final since = _sinceController.text.trim();
+    if (name.isEmpty || title.isEmpty || since.isEmpty) {
+      _showSnack('Name, title, and since year are required.', isError: true);
+      return;
+    }
+
+    if (since.length < 4 || int.tryParse(since) == null) {
+      _showSnack('Please enter a valid start year (e.g., 2014).', isError: true);
       return;
     }
 
@@ -64,7 +71,7 @@ class _ReportSignatorySettingsScreenState extends State<ReportSignatorySettingsS
       _isSaving = true;
     });
 
-    final signatory = ReportSignatory(preparedByName: name, preparedByTitle: title);
+    final signatory = ReportSignatory(preparedByName: name, preparedByTitle: title, since: since);
 
     try {
       await ReportSignatoryService.addEntry(signatory);
@@ -95,6 +102,7 @@ class _ReportSignatorySettingsScreenState extends State<ReportSignatorySettingsS
       await ReportSignatoryService.setCurrentFromEntry(entry.id);
       _nameController.text = entry.signatory.preparedByName;
       _titleController.text = entry.signatory.preparedByTitle;
+      _sinceController.text = entry.signatory.since;
       await _loadSignatory();
       if (mounted) _showSnack('Signatory updated.');
     } catch (e) {
@@ -159,6 +167,7 @@ class _ReportSignatorySettingsScreenState extends State<ReportSignatorySettingsS
   void dispose() {
     _nameController.dispose();
     _titleController.dispose();
+    _sinceController.dispose();
     super.dispose();
   }
 
@@ -223,6 +232,16 @@ class _ReportSignatorySettingsScreenState extends State<ReportSignatorySettingsS
                       prefixIcon: Icon(Icons.work_outline),
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _sinceController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Since (Year started)',
+                      helperText: 'Example: 2014',
+                      prefixIcon: Icon(Icons.calendar_today_outlined),
+                    ),
+                  ),
                   const SizedBox(height: 20),
                   Align(
                     alignment: Alignment.centerRight,
@@ -280,10 +299,10 @@ class _ReportSignatorySettingsScreenState extends State<ReportSignatorySettingsS
             itemBuilder: (context, index) {
               final entry = entries[index];
               final isCurrent = _isCurrent(entry);
-              final created = entry.createdAt != null ? DateFormat('MMM d, yyyy h:mm a').format(entry.createdAt!) : 'Unknown date';
+              final sinceValue = entry.signatory.since.isNotEmpty ? entry.signatory.since : 'Unknown';
               return ListTile(
                 title: Text(entry.signatory.preparedByName, style: const TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: Text('${entry.signatory.preparedByTitle}\n$created'),
+                subtitle: Text('${entry.signatory.preparedByTitle}\nSince: $sinceValue'),
                 isThreeLine: true,
                 trailing: ConstrainedBox(
                   constraints: const BoxConstraints(minWidth: 160),
