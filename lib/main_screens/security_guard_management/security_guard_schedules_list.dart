@@ -10,7 +10,6 @@ class SecurityGuardSchedulesListScreen extends StatelessWidget {
   Stream<List<Map<String, dynamic>>> _onDutyGuardsStream() {
     final firestore = FirebaseFirestore.instance;
     final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    // Stream on-duty guards; enrich with today's schedule (if any)
     return firestore
         .collection('Accounts')
         .where('role', isEqualTo: 'Security')
@@ -120,16 +119,4 @@ class SecurityGuardSchedulesListScreen extends StatelessWidget {
     );
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
 

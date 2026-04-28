@@ -36,7 +36,6 @@ class _WeeklyScheduleScreenState extends State<WeeklyScheduleScreen> {
     super.initState();
     _fetchGuards();
     _fetchCheckpoints();
-    // Set to Monday of current week
     _selectedWeekStart = _getMondayOfWeek(DateTime.now());
     _fetchGuardsWithOngoingSchedules();
   }

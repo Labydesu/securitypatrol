@@ -1,4 +1,3 @@
-// main_screens/models/users_model.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class UserModel {
@@ -8,9 +7,8 @@ class UserModel {
   String name;
   final String email;
   final String role;
-  final String status; // Operational status like "On Duty" / "Off Duty"
-  final String accountStatus; // "Active" / "Inactive" based on Firebase Auth disable state
-  // Add any other fields like 'sex', 'address', 'contact', 'guard_id', 'position' if needed by this page
+  final String status;
+  final String accountStatus;
 
   UserModel({
     required this.id,

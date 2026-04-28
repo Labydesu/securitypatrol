@@ -20,23 +20,7 @@ class AppLogger {
         'timestamp': FieldValue.serverTimestamp(),
       });
     } catch (_) {
-      // Swallow logging errors to avoid breaking UX
     }
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

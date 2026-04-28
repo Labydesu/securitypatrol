@@ -7,7 +7,6 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
 import 'package:flutter/services.dart' show rootBundle;
-// Removed google fonts; use bundled assets
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:thesis_web/utils/download_saver.dart';
 import 'dart:io';
@@ -114,7 +113,6 @@ class _CheckpointListReportScreenState extends State<CheckpointListReportScreen>
     try {
       final boldData = await rootBundle.load('assets/fonts/Roboto-Bold.ttf');
       bold = pw.Font.ttf(boldData);
-      // Regular is optional; if missing, use bold as base too
       try {
         final baseData = await rootBundle.load('assets/fonts/Roboto-Regular.ttf');
         base = pw.Font.ttf(baseData);
@@ -122,7 +120,6 @@ class _CheckpointListReportScreenState extends State<CheckpointListReportScreen>
         base = bold;
       }
     } catch (e) {
-      // If even bold cannot be loaded, rethrow to surface the configuration issue
       rethrow;
     }
 
@@ -146,7 +143,6 @@ class _CheckpointListReportScreenState extends State<CheckpointListReportScreen>
     final doc = pw.Document(theme: pw.ThemeData.withFont(base: base, bold: bold));
     doc.addPage(
       pw.MultiPage(
-        // ✅ Using the newly defined 8x13 page format
         pageFormat: _longBondPageFormat,
         margin: const pw.EdgeInsets.only(left: 30, right: 30, top: 20, bottom: 10),
         header: (context) => headerImage != null
@@ -158,14 +154,12 @@ class _CheckpointListReportScreenState extends State<CheckpointListReportScreen>
           ),
         )
             : pw.SizedBox.shrink(),
-        // 🟢 MODIFIED FOOTER: Signature block conditional on last page, above footer image.
         footer: (context) {
           final isLastPage = context.pageNumber == context.pagesCount;
 
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
-              // Signature Block (Only on Last Page)
               if (isLastPage)
                 pw.Padding(
                   padding: const pw.EdgeInsets.only(top: 8, bottom: 12),
@@ -187,7 +181,6 @@ class _CheckpointListReportScreenState extends State<CheckpointListReportScreen>
                   ),
                 ),
 
-              // Footer Image (Every Page)
               if (footerImage != null)
                 pw.Center(
                   child: pw.Image(

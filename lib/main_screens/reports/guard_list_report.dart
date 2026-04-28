@@ -162,7 +162,6 @@ class _GuardListReportScreenState extends State<GuardListReportScreen> {
       footerImage = pw.MemoryImage(footerBytes.buffer.asUint8List());
     } catch (_) {}
 
-    // 🎯 DEFINING THE 8x13 INCH (LONG BOND) PAGE FORMAT
     const double longBondWidth = 8.0 * PdfPageFormat.inch;
     const double longBondHeight = 13.0 * PdfPageFormat.inch;
     final PdfPageFormat _longBondPageFormat = PdfPageFormat(longBondWidth, longBondHeight);
@@ -170,10 +169,8 @@ class _GuardListReportScreenState extends State<GuardListReportScreen> {
     final doc = pw.Document(theme: pw.ThemeData.withFont(base: base, bold: bold));
     doc.addPage(
       pw.MultiPage(
-        // ✅ Using the defined 8x13 page format
         pageFormat: _longBondPageFormat,
         margin: const pw.EdgeInsets.only(left: 30, right: 30, top: 20, bottom: 10),
-        // 🎯 HEADER IS ON EVERY PAGE
         header: (context) => headerImage != null
             ? pw.Center(
           child: pw.Image(
@@ -183,7 +180,6 @@ class _GuardListReportScreenState extends State<GuardListReportScreen> {
           ),
         )
             : pw.SizedBox.shrink(),
-        // 🟢 CORRECTED FOOTER: Signature block is conditional (last page only), above the image (every page).
         footer: (context) {
           final isLastPage = context.pageNumber == context.pagesCount;
 
@@ -226,7 +222,6 @@ class _GuardListReportScreenState extends State<GuardListReportScreen> {
             ],
           );
         },
-        // 🎯 BUILD: Contains the main content only.
         build: (context) => [
           pw.Center(
             child: pw.Text(

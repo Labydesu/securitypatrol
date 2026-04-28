@@ -19,16 +19,12 @@ class _AssignScheduleScreenState extends State<AssignScheduleScreen> {
   DateTime? _selectedDay;
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
-  // Period selection for daily assignment
-  String _periodType = 'Single Day'; // Single Day, Range, Multiple Days
+  String _periodType = 'Single Day';
   DateTimeRange? _customRange;
   final List<DateTime> _selectedDates = [];
-  // Store multiple selected dates for "Multiple Days" mode
   final Set<DateTime> _multipleSelectedDates = {};
-  // Stores selected user-facing guard IDs (Accounts.guard_id)
   List<String> selectedGuardIds = [];
   final TextEditingController searchController = TextEditingController();
-  // Checkpoint selection state
   final TextEditingController _cpSearchController = TextEditingController();
   List<Map<String, dynamic>> _allCheckpoints = [];
   List<String> _selectedCheckpointIds = [];
@@ -36,12 +32,9 @@ class _AssignScheduleScreenState extends State<AssignScheduleScreen> {
   List<Map<String, dynamic>> allGuards = [];
   bool _isLoadingGuards = true;
   bool _isLoadingCheckpoints = true;
-  // Fast lookup map for logging and UI: guard_id -> name
   Map<String, String> _guardIdToName = {};
-  // Track already assigned checkpoints for the selected date
   Set<String> _assignedCheckpointIds = {};
   bool _isLoadingAssignedCheckpoints = false;
-  // Track guards with ongoing schedules
   Set<String> _guardsWithOngoingSchedules = {};
   bool _isLoadingGuardSchedules = false;
 
@@ -50,14 +43,12 @@ class _AssignScheduleScreenState extends State<AssignScheduleScreen> {
     super.initState();
     _fetchGuards();
     _fetchCheckpoints();
-    // Default to today and prefetch assigned checkpoints and guard schedules to prevent duplicates
     _selectedDay = DateTime.now();
     final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDay!);
     _fetchAssignedCheckpoints(dateStr);
     _fetchGuardsWithOngoingSchedules(dateStr);
   }
 
-  // Utilities to compute dates for daily scheduling
 
   void _populateSelectedDates() {
     _selectedDates.clear();
@@ -72,13 +63,11 @@ class _AssignScheduleScreenState extends State<AssignScheduleScreen> {
         d = d.add(const Duration(days: 1));
       }
     } else if (_periodType == 'Multiple Days') {
-      // For Multiple Days mode, use the stored set of selected dates
       _selectedDates.addAll(_multipleSelectedDates);
     }
     setState(() {});
   }
 
-  // Helper to check if a date is selected in Multiple Days mode
   bool _isDateSelected(DateTime date) {
     final normalized = DateTime(date.year, date.month, date.day);
     return _multipleSelectedDates.any((d) => 
@@ -126,7 +115,6 @@ class _AssignScheduleScreenState extends State<AssignScheduleScreen> {
                   aFallbackName: a['fallback_name'],
                   bFallbackName: b['fallback_name'],
                 ));
-          // Build lookup map for reliable name resolution during logging
           _guardIdToName = {
             for (final g in allGuards)
               if ((g['guard_id'] ?? '').toString().isNotEmpty)
@@ -202,10 +190,8 @@ class _AssignScheduleScreenState extends State<AssignScheduleScreen> {
             final startTime = data['start_time'] as String?;
             final endTime = data['end_time'] as String?;
             final checkpoints = data['checkpoints'] as List<dynamic>?;
-            
-            // Only consider checkpoints as "assigned" if the schedule is currently active
+
             if (startTime != null && endTime != null && checkpoints != null) {
-              // Check if current time is within the schedule's time range
               if (_isTimeInRange(currentTime, startTime, endTime)) {
                 for (var checkpointId in checkpoints) {
                   _assignedCheckpointIds.add(checkpointId.toString());
@@ -253,10 +239,8 @@ class _AssignScheduleScreenState extends State<AssignScheduleScreen> {
             final guardId = data['guard_id'] as String?;
             final startTime = data['start_time'] as String?;
             final endTime = data['end_time'] as String?;
-            
-            // Only consider guards as "busy" if they have an ongoing schedule
+
             if (guardId != null && startTime != null && endTime != null) {
-              // Check if current time is within the schedule's time range
               if (_isTimeInRange(currentTime, startTime, endTime)) {
                 _guardsWithOngoingSchedules.add(guardId);
               }
@@ -302,10 +286,8 @@ class _AssignScheduleScreenState extends State<AssignScheduleScreen> {
     return '$hour:$minute';
   }
 
-  // Helper function to check if a time is within a given range
   bool _isTimeInRange(String currentTime, String startTime, String endTime) {
     try {
-      // Parse time strings to minutes since midnight
       int parseTime(String timeStr) {
         final parts = timeStr.split(':');
         return int.parse(parts[0]) * 60 + int.parse(parts[1]);
@@ -314,25 +296,19 @@ class _AssignScheduleScreenState extends State<AssignScheduleScreen> {
       final current = parseTime(currentTime);
       final start = parseTime(startTime);
       final end = parseTime(endTime);
-      
-      // Handle overnight shifts (end time is next day)
+
       if (end < start) {
-        // Overnight shift: current time should be >= start OR <= end
         return current >= start || current <= end;
       } else {
-        // Normal shift: current time should be >= start AND <= end
         return current >= start && current <= end;
       }
     } catch (e) {
-      // If parsing fails, assume not in range to be safe
       return false;
     }
   }
 
-  // Helper function to check if two time ranges overlap
   bool _timesOverlap(String start1, String end1, String start2, String end2) {
     try {
-      // Parse time strings to minutes since midnight
       int parseTime(String timeStr) {
         final parts = timeStr.split(':');
         return int.parse(parts[0]) * 60 + int.parse(parts[1]);
@@ -342,15 +318,12 @@ class _AssignScheduleScreenState extends State<AssignScheduleScreen> {
       final e1 = parseTime(end1);
       final s2 = parseTime(start2);
       final e2 = parseTime(end2);
-      
-      // Handle overnight shifts (end time is next day)
+
       final e1Adjusted = e1 < s1 ? e1 + 24 * 60 : e1;
       final e2Adjusted = e2 < s2 ? e2 + 24 * 60 : e2;
-      
-      // Check for overlap: two ranges overlap if one starts before the other ends
+
       return s1 < e2Adjusted && s2 < e1Adjusted;
     } catch (e) {
-      // If parsing fails, assume no overlap to be safe
       return false;
     }
   }
@@ -365,8 +338,7 @@ class _AssignScheduleScreenState extends State<AssignScheduleScreen> {
       );
       return;
     }
-    
-    // Validate Multiple Days mode has at least one date selected
+
     if (_periodType == 'Multiple Days' && _multipleSelectedDates.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select at least one date in Multiple Days mode.')),
@@ -374,7 +346,6 @@ class _AssignScheduleScreenState extends State<AssignScheduleScreen> {
       return;
     }
 
-    // Build selected dates based on period
     _populateSelectedDates();
     if (_selectedDates.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -383,8 +354,6 @@ class _AssignScheduleScreenState extends State<AssignScheduleScreen> {
       return;
     }
 
-    // Re-check conflicts from Firestore to avoid race conditions
-    // For batch: check conflicts per date considering time overlap
     for (final d in _selectedDates) {
       final String dateStrForConflict = DateFormat('yyyy-MM-dd').format(d);
       try {
@@ -392,8 +361,7 @@ class _AssignScheduleScreenState extends State<AssignScheduleScreen> {
             .collection('Schedules')
             .where('date', isEqualTo: dateStrForConflict)
             .get();
-        
-        // Check for time overlaps with existing schedules
+
         final startStr = format24Hour(_startTime!);
         final endStr = format24Hour(_endTime!);
         
@@ -404,11 +372,9 @@ class _AssignScheduleScreenState extends State<AssignScheduleScreen> {
           final existingStartTime = data['start_time'] as String?;
           final existingEndTime = data['end_time'] as String?;
           final existingCheckpoints = (data['checkpoints'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const <String>[];
-          
-          // Check if times overlap
+
           if (existingStartTime != null && existingEndTime != null) {
             if (_timesOverlap(startStr, endStr, existingStartTime, existingEndTime)) {
-              // Only consider checkpoints that are in both schedules
               for (final checkpointId in _selectedCheckpointIds) {
                 if (existingCheckpoints.contains(checkpointId)) {
                   conflictingCheckpoints.add(checkpointId);

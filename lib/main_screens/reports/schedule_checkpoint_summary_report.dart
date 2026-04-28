@@ -578,7 +578,6 @@ class _ScheduleCheckpointSummaryReportScreenState extends State<ScheduleCheckpoi
             }
           }
         } catch (_) {
-          // Fallback: try TransactionLogs without range filters
           try {
             final tlogs = await _firestore
                 .collection('TransactionLogs')

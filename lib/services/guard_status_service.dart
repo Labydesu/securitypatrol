@@ -12,7 +12,6 @@ class GuardStatusService {
     final todayStr = DateFormat('yyyy-MM-dd').format(now);
     final currentMinutes = now.hour * 60 + now.minute;
 
-    // Fetch all security guards (Accounts.role == Security)
     final guardsSnap = await firestore
         .collection('Accounts')
         .where('role', isEqualTo: 'Security')
@@ -20,7 +19,6 @@ class GuardStatusService {
 
     if (guardsSnap.docs.isEmpty) return;
 
-    // Fetch today's schedules
     final schedulesSnap = await firestore
         .collection('Schedules')
         .where('date', isEqualTo: todayStr)

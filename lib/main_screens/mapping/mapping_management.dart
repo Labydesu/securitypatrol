@@ -24,11 +24,8 @@ class _MappingManagementScreenState extends State<MappingManagementScreen> {
   List<CheckpointModel> _checkpoints = [];
   LatLng? _selectedLatLng;
   bool _isSelecting = false;
-  // Controller kept for future interactions; suppress unused warning by referencing in build
-  // Note: store controller for completeness
   GoogleMapController? _mapController;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _checkpointSub;
-  // Small custom circle icons to ensure color reflects status across platforms
   BitmapDescriptor? _iconScanned;
   BitmapDescriptor? _iconNotScanned;
 
@@ -79,11 +76,9 @@ class _MappingManagementScreenState extends State<MappingManagementScreen> {
     final canvas = Canvas(recorder);
     final double radius = size / 2.0;
 
-    // Outer white border
     final borderPaint = Paint()..color = Colors.white;
     canvas.drawCircle(Offset(radius, radius), radius, borderPaint);
 
-    // Inner colored circle
     final fillPaint = Paint()..color = color;
     canvas.drawCircle(Offset(radius, radius), radius - 3, fillPaint);
 
